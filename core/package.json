@@ -1,0 +1,23 @@
+{
+  "name": "core",
+  "private": true,
+  "version": "1.0.0",
+  "description": "",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "node ./scripts/build.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "devDependencies": {
+    "esbuild": "^0.24.0"
+  }
+}
