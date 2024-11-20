@@ -655,6 +655,7 @@ monaco.languages.onLanguage('moonbit', async () => {
 })
 
 monaco.editor.onDidCreateModel(async model => {
+  if (model.uri.scheme === 'moonbit-core') return
   const c = await connection.connection
   model.onDidChangeContent(e => {
     c.sendNotification(lsp.DidChangeTextDocumentNotification.type, {
@@ -691,6 +692,7 @@ const completionProvider: monaco.languages.CompletionItemProvider = {
       textDocument: { uri: model.uri.toString() },
       context: adaptor.completionContextAdaptor.from(context),
     } satisfies lsp.CompletionParams)
+    if (res === null) return null
     return adaptor.completionListAdaptor.to(res, wordRange)
   },
 }
@@ -698,4 +700,131 @@ const completionProvider: monaco.languages.CompletionItemProvider = {
 monaco.languages.registerCompletionItemProvider(
   { language: 'moonbit' },
   completionProvider,
+)
+
+const hoverProvider: monaco.languages.HoverProvider = {
+  async provideHover(model, position, _token, _context) {
+    const c = await connection.connection
+    const res = await c.sendRequest(lsp.HoverRequest.type, {
+      position: adaptor.positionAdaptor.from(position),
+      textDocument: { uri: model.uri.toString() },
+    } satisfies lsp.HoverParams)
+    if (res === null) return null
+    return adaptor.hoverAdaptor.to(res)
+  },
+}
+
+monaco.languages.registerHoverProvider({ language: 'moonbit' }, hoverProvider)
+
+const documentFormattingEditProvider: monaco.languages.DocumentFormattingEditProvider =
+  {
+    async provideDocumentFormattingEdits(model, options, _token) {
+      const c = await connection.connection
+      const res = await c.sendRequest(lsp.DocumentFormattingRequest.type, {
+        textDocument: { uri: model.uri.toString() },
+        options: adaptor.formattingOptionsAdaptor.from(options),
+      } satisfies lsp.DocumentFormattingParams)
+      if (res === null) return null
+      return res.map(adaptor.textEditAdaptor.to)
+    },
+  }
+
+monaco.languages.registerDocumentFormattingEditProvider(
+  { language: 'moonbit' },
+  documentFormattingEditProvider,
+)
+
+const signatureHelpProvider: monaco.languages.SignatureHelpProvider = {
+  signatureHelpTriggerCharacters: ['(', ','],
+  async provideSignatureHelp(model, position, _token, context) {
+    const c = await connection.connection
+    const res = await c.sendRequest(lsp.SignatureHelpRequest.type, {
+      position: adaptor.positionAdaptor.from(position),
+      textDocument: { uri: model.uri.toString() },
+      context: adaptor.signatureHelpContextAdaptor.from(context),
+    } satisfies lsp.SignatureHelpParams)
+    if (res === null) return null
+    return {
+      value: adaptor.signatureHelpAdaptor.to(res),
+      dispose() {},
+    }
+  },
+}
+monaco.languages.registerSignatureHelpProvider(
+  { language: 'moonbit' },
+  signatureHelpProvider,
+)
+
+const definitionProvider: monaco.languages.DefinitionProvider = {
+  async provideDefinition(model, position, _token) {
+    const c = await connection.connection
+    const res = await c.sendRequest(lsp.DefinitionRequest.type, {
+      position: adaptor.positionAdaptor.from(position),
+      textDocument: { uri: model.uri.toString() },
+    } satisfies lsp.DefinitionParams)
+    if (res === null) return null
+    if (Array.isArray(res) && lsp.LocationLink.is(res[0])) {
+      console.error('LocationLink not supported yet')
+      return null
+    } else {
+      return adaptor.definitionAdaptor.to(res as lsp.Definition)
+    }
+  },
+}
+monaco.languages.registerDefinitionProvider(
+  { language: 'moonbit' },
+  definitionProvider,
+)
+
+const renameProvider: monaco.languages.RenameProvider = {
+  async resolveRenameLocation(model, position, _token) {
+    const c = await connection.connection
+    const defaultWord = model.getWordAtPosition(position)
+    if (defaultWord === null) return null
+    const defaultRange = new monaco.Range(
+      position.lineNumber,
+      defaultWord.startColumn,
+      position.lineNumber,
+      defaultWord.endColumn,
+    )
+    const defaultText = defaultWord.word
+    const res = await c.sendRequest(lsp.PrepareRenameRequest.type, {
+      textDocument: { uri: model.uri.toString() },
+      position: adaptor.positionAdaptor.from(position),
+    } satisfies lsp.PrepareRenameParams)
+    if (res === null) return null
+    return adaptor.prepareRenameResultAdaptor.to(res, defaultRange, defaultText)
+  },
+  async provideRenameEdits(model, position, newName, _token) {
+    const c = await connection.connection
+    const res = await c.sendRequest(lsp.RenameRequest.type, {
+      textDocument: { uri: model.uri.toString() },
+      position: adaptor.positionAdaptor.from(position),
+      newName,
+    } satisfies lsp.RenameParams)
+    if (res === null) return null
+    return adaptor.workspaceEditAdaptor.to(res)
+  },
+}
+
+monaco.languages.registerRenameProvider({ language: 'moonbit' }, renameProvider)
+
+const referenceProvider: monaco.languages.ReferenceProvider = {
+  async provideReferences(model, position, context, _token) {
+    const c = await connection.connection
+    const res = await c.sendRequest(lsp.ReferencesRequest.type, {
+      position: adaptor.positionAdaptor.from(position),
+      textDocument: { uri: model.uri.toString() },
+      context,
+    } satisfies lsp.ReferenceParams)
+    if (res === null) return null
+    return res
+      .filter(l => !l.uri.startsWith('moonbit-core'))
+      .map(adaptor.locationAdaptor.to)
+  },
+}
+
+monaco.languages.registerReferenceProvider(
+  { language: 'moonbit' },
+  referenceProvider,
 )

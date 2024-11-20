@@ -110,17 +110,29 @@ export const completionContextAdaptor: Adaptor<
 }
 
 const markupAdaptor: Adaptor<lsp.MarkupContent, monaco.IMarkdownString> = {
-  from: function (_m: monaco.IMarkdownString): lsp.MarkupContent {
-    throw new Error('Function not implemented.')
-  },
-  to: function (markup: lsp.MarkupContent): monaco.IMarkdownString {
+  from: function (m: monaco.IMarkdownString): lsp.MarkupContent {
     return {
-      value: markup.value,
+      kind: lsp.MarkupKind.Markdown,
+      value: m.value,
+    }
+  },
+  to: function (l: lsp.MarkupContent): monaco.IMarkdownString {
+    return l
+  },
+}
+
+const markedStringAdaptor: Adaptor<lsp.MarkedString, monaco.IMarkdownString> = {
+  from: function (m: monaco.IMarkdownString): lsp.MarkedString {
+    return m.value
+  },
+  to: function (l: lsp.MarkedString): monaco.IMarkdownString {
+    return {
+      value: typeof l === 'string' ? l : l.value,
     }
   },
 }
 
-const textEditAdaptor: Adaptor<
+const singleEditAdaptor: Adaptor<
   lsp.TextEdit,
   monaco.editor.ISingleEditOperation
 > = {
@@ -192,7 +204,7 @@ const completionItemAdaptor: Adaptor<
         : item.documentation
       : undefined
     const additionalTextEdits = item.additionalTextEdits
-      ? item.additionalTextEdits.map(textEditAdaptor.to)
+      ? item.additionalTextEdits.map(singleEditAdaptor.to)
       : undefined
     return {
       ...item,
@@ -207,22 +219,330 @@ const completionItemAdaptor: Adaptor<
 }
 
 export const completionListAdaptor: Adaptor<
-  lsp.CompletionList | lsp.CompletionItem[] | null,
+  lsp.CompletionList | lsp.CompletionItem[],
   monaco.languages.CompletionList
 > = {
   from: function (
     _m: monaco.languages.CompletionList,
-  ): lsp.CompletionList | lsp.CompletionItem[] | null {
+  ): lsp.CompletionList | lsp.CompletionItem[] {
     throw new Error('Function not implemented.')
   },
   to: function (
-    completions: lsp.CompletionList | lsp.CompletionItem[] | null,
+    completions: lsp.CompletionList | lsp.CompletionItem[],
     range: monaco.IRange,
   ): monaco.languages.CompletionList {
-    if (completions === null) return { suggestions: [] }
     const items = Array.isArray(completions) ? completions : completions.items
     return {
       suggestions: items.map(i => completionItemAdaptor.to(i, range)),
+    }
+  },
+}
+
+export const hoverAdaptor: Adaptor<lsp.Hover, monaco.languages.Hover> = {
+  from: function (_m: monaco.languages.Hover): lsp.Hover {
+    throw new Error('Function not implemented.')
+  },
+  to: function (hover: lsp.Hover): monaco.languages.Hover {
+    const range = hover.range ? rangeAdaptor.to(hover.range) : undefined
+    if (Array.isArray(hover.contents)) {
+      return {
+        range,
+        contents: hover.contents.map(markedStringAdaptor.to),
+      }
+    } else if (lsp.MarkedString.is(hover.contents)) {
+      return {
+        range,
+        contents: [markedStringAdaptor.to(hover.contents)],
+      }
+    } else {
+      return {
+        range,
+        contents: [markupAdaptor.to(hover.contents)],
+      }
+    }
+  },
+}
+
+export const formattingOptionsAdaptor: Adaptor<
+  lsp.FormattingOptions,
+  monaco.languages.FormattingOptions
+> = {
+  from: function (
+    m: monaco.languages.FormattingOptions,
+  ): lsp.FormattingOptions {
+    return {
+      insertSpaces: m.insertSpaces,
+      tabSize: m.tabSize,
+    }
+  },
+  to: function (_l: lsp.FormattingOptions): monaco.languages.FormattingOptions {
+    throw new Error('Function not implemented.')
+  },
+}
+
+export const textEditAdaptor: Adaptor<lsp.TextEdit, monaco.languages.TextEdit> =
+  {
+    from: function (_m: monaco.languages.TextEdit): lsp.TextEdit {
+      throw new Error('Function not implemented.')
+    },
+    to: function (l: lsp.TextEdit): monaco.languages.TextEdit {
+      return {
+        range: rangeAdaptor.to(l.range),
+        text: l.newText,
+      }
+    },
+  }
+
+const fromSignatureHelpTriggerKindMap = {
+  [monaco.languages.SignatureHelpTriggerKind.Invoke]:
+    lsp.SignatureHelpTriggerKind.Invoked,
+  [monaco.languages.SignatureHelpTriggerKind.ContentChange]:
+    lsp.SignatureHelpTriggerKind.ContentChange,
+  [monaco.languages.SignatureHelpTriggerKind.TriggerCharacter]:
+    lsp.SignatureHelpTriggerKind.TriggerCharacter,
+}
+
+const toSignatureHelpTriggerKindMap = {
+  [lsp.SignatureHelpTriggerKind.Invoked]:
+    monaco.languages.SignatureHelpTriggerKind.Invoke,
+  [lsp.SignatureHelpTriggerKind.TriggerCharacter]:
+    monaco.languages.SignatureHelpTriggerKind.TriggerCharacter,
+  [lsp.SignatureHelpTriggerKind.ContentChange]:
+    monaco.languages.SignatureHelpTriggerKind.ContentChange,
+}
+
+export const signatureHelpContextAdaptor: Adaptor<
+  lsp.SignatureHelpContext,
+  monaco.languages.SignatureHelpContext
+> = {
+  from: function (
+    m: monaco.languages.SignatureHelpContext,
+  ): lsp.SignatureHelpContext {
+    return {
+      isRetrigger: m.isRetrigger,
+      triggerKind: fromSignatureHelpTriggerKindMap[m.triggerKind],
+      triggerCharacter: m.triggerCharacter,
+    }
+  },
+  to: function (
+    l: lsp.SignatureHelpContext,
+  ): monaco.languages.SignatureHelpContext {
+    return {
+      isRetrigger: l.isRetrigger,
+      triggerKind: toSignatureHelpTriggerKindMap[l.triggerKind],
+      activeSignatureHelp: l.activeSignatureHelp
+        ? signatureHelpAdaptor.to(l.activeSignatureHelp)
+        : undefined,
+      triggerCharacter: l.triggerCharacter,
+    }
+  },
+}
+
+const ParameterInformationAdapter: Adaptor<
+  lsp.ParameterInformation,
+  monaco.languages.ParameterInformation
+> = {
+  from: function (
+    m: monaco.languages.ParameterInformation,
+  ): lsp.ParameterInformation {
+    if (m.documentation) {
+      if (typeof m.documentation === 'string') {
+        return {
+          label: m.label,
+          documentation: m.documentation,
+        }
+      } else {
+        return {
+          label: m.label,
+          documentation: markupAdaptor.from(m.documentation),
+        }
+      }
+    } else {
+      return {
+        label: m.label,
+      }
+    }
+  },
+  to: function (
+    l: lsp.ParameterInformation,
+  ): monaco.languages.ParameterInformation {
+    if (l.documentation) {
+      if (typeof l.documentation === 'string') {
+        return {
+          label: l.label,
+          documentation: l.documentation,
+        }
+      } else {
+        return {
+          label: l.label,
+          documentation: markupAdaptor.to(l.documentation),
+        }
+      }
+    } else {
+      return {
+        label: l.label,
+      }
+    }
+  },
+}
+
+const SignatureInformationAdaptor: Adaptor<
+  lsp.SignatureInformation,
+  monaco.languages.SignatureInformation
+> = {
+  from: function (
+    m: monaco.languages.SignatureInformation,
+  ): lsp.SignatureInformation {
+    const base = {
+      label: m.label,
+      activeParameter: m.activeParameter,
+      parameters: m.parameters.map(ParameterInformationAdapter.from),
+    }
+    if (m.documentation) {
+      if (typeof m.documentation === 'string') {
+        return {
+          ...base,
+          documentation: m.documentation,
+        }
+      } else {
+        return {
+          ...base,
+          documentation: markupAdaptor.from(m.documentation),
+        }
+      }
+    } else {
+      return base
+    }
+  },
+  to: function (
+    l: lsp.SignatureInformation,
+  ): monaco.languages.SignatureInformation {
+    return {
+      label: l.label,
+      parameters: l.parameters
+        ? l.parameters.map(ParameterInformationAdapter.to)
+        : [],
+      activeParameter: l.activeParameter,
+      documentation: l.documentation,
+    }
+  },
+}
+
+export const signatureHelpAdaptor: Adaptor<
+  lsp.SignatureHelp,
+  monaco.languages.SignatureHelp
+> = {
+  from: function (m: monaco.languages.SignatureHelp): lsp.SignatureHelp {
+    return {
+      signatures: m.signatures.map(SignatureInformationAdaptor.from),
+      activeParameter: m.activeParameter,
+      activeSignature: m.activeSignature,
+    }
+  },
+  to: function (l: lsp.SignatureHelp): monaco.languages.SignatureHelp {
+    return {
+      activeParameter: l.activeParameter ?? 0,
+      activeSignature: l.activeSignature ?? 0,
+      signatures: l.signatures.map(SignatureInformationAdaptor.to),
+    }
+  },
+}
+
+export const locationAdaptor: Adaptor<lsp.Location, monaco.languages.Location> =
+  {
+    from: function (m: monaco.languages.Location): lsp.Location {
+      return {
+        range: rangeAdaptor.from(m.range),
+        uri: m.uri.toString(),
+      }
+    },
+    to: function (l: lsp.Location): monaco.languages.Location {
+      return {
+        range: rangeAdaptor.to(l.range),
+        uri: monaco.Uri.parse(l.uri),
+      }
+    },
+  }
+
+export const definitionAdaptor: Adaptor<
+  lsp.Definition,
+  monaco.languages.Definition
+> = {
+  from: function (m: monaco.languages.Definition): lsp.Definition {
+    if (Array.isArray(m)) {
+      return m.map(locationAdaptor.from)
+    } else {
+      return locationAdaptor.from(m)
+    }
+  },
+  to: function (l: lsp.Definition): monaco.languages.Definition {
+    if (lsp.Location.is(l)) {
+      return locationAdaptor.to(l)
+    } else {
+      return l.map(locationAdaptor.to)
+    }
+  },
+}
+
+export const prepareRenameResultAdaptor: Adaptor<
+  lsp.PrepareRenameResult,
+  monaco.languages.RenameLocation & monaco.languages.Rejection
+> = {
+  from: function (
+    _m: monaco.languages.RenameLocation & monaco.languages.Rejection,
+  ): lsp.PrepareRenameResult {
+    throw new Error('Function not implemented.')
+  },
+  to: function (
+    l: lsp.PrepareRenameResult,
+    defaultRange: monaco.IRange,
+    defaultWord: string,
+  ): monaco.languages.RenameLocation & monaco.languages.Rejection {
+    if (lsp.Range.is(l)) {
+      const range = rangeAdaptor.to(l)
+      return {
+        range,
+        text: defaultWord,
+      }
+    } else if ('range' in l) {
+      return {
+        range: rangeAdaptor.to(l.range),
+        text: l.placeholder,
+      }
+    } else {
+      return {
+        range: defaultRange,
+        text: defaultWord,
+      }
+    }
+  },
+}
+
+export const workspaceEditAdaptor: Adaptor<
+  lsp.WorkspaceEdit,
+  monaco.languages.WorkspaceEdit
+> = {
+  from: function (_m: monaco.languages.WorkspaceEdit): lsp.WorkspaceEdit {
+    throw new Error('Function not implemented.')
+  },
+  to: function (l: lsp.WorkspaceEdit): monaco.languages.WorkspaceEdit {
+    const edits: monaco.languages.IWorkspaceTextEdit[] = []
+    if (l.changes) {
+      for (const uri in l.changes) {
+        for (const edit of l.changes[uri]) {
+          const resource = monaco.Uri.parse(uri)
+          const model = monaco.editor.getModel(resource)
+          if (model === null) continue
+          edits.push({
+            resource,
+            textEdit: textEditAdaptor.to(edit),
+            versionId: model.getVersionId(),
+          })
+        }
+      }
+      return { edits }
+    } else {
+      return { edits }
     }
   },
 }

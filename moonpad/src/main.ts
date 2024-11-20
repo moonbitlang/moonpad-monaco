@@ -14,8 +14,13 @@ self.MonacoEnvironment = {
 monaco.editor.setTheme('light-plus')
 
 monaco.editor.create(document.getElementById('app')!, {
-  value: `fn main {
-  println("hello)
+  value: `
+fn add(a: Int, b: Int) -> Int {
+  a + b
+}
+fn main {
+  println("hello")
+  println(add(1, 2))
 }`,
   language: 'moonbit',
 })
