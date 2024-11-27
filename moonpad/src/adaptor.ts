@@ -1,9 +1,9 @@
-import * as lsp from 'vscode-languageserver-protocol'
-import * as monaco from 'monaco-editor-core'
+import * as monaco from "monaco-editor-core";
+import * as lsp from "vscode-languageserver-protocol";
 
 interface Adaptor<Lsp, Monaco> {
-  from(m: Monaco, ...args: any[]): Lsp
-  to(l: Lsp, ...args: any[]): Monaco
+  from(m: Monaco, ...args: any[]): Lsp;
+  to(l: Lsp, ...args: any[]): Monaco;
 }
 
 export const rangeAdaptor: Adaptor<lsp.Range, monaco.IRange> = {
@@ -14,7 +14,7 @@ export const rangeAdaptor: Adaptor<lsp.Range, monaco.IRange> = {
         character: range.startColumn - 1,
       },
       end: { line: range.endLineNumber - 1, character: range.endColumn - 1 },
-    }
+    };
   },
   to(range: lsp.Range): monaco.IRange {
     return {
@@ -22,9 +22,9 @@ export const rangeAdaptor: Adaptor<lsp.Range, monaco.IRange> = {
       startColumn: range.start.character + 1,
       endLineNumber: range.end.line + 1,
       endColumn: range.end.character + 1,
-    }
+    };
   },
-}
+};
 
 export const contentChangeAdaptor: Adaptor<
   lsp.TextDocumentContentChangeEvent,
@@ -36,28 +36,28 @@ export const contentChangeAdaptor: Adaptor<
     return {
       range: rangeAdaptor.from(m.range),
       text: m.text,
-    }
+    };
   },
   to: function (
     _l: lsp.TextDocumentContentChangeEvent,
   ): monaco.editor.IModelContentChange {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
-}
+};
 
 const severityMap = {
   [lsp.DiagnosticSeverity.Error]: monaco.MarkerSeverity.Error,
   [lsp.DiagnosticSeverity.Warning]: monaco.MarkerSeverity.Warning,
   [lsp.DiagnosticSeverity.Information]: monaco.MarkerSeverity.Info,
   [lsp.DiagnosticSeverity.Hint]: monaco.MarkerSeverity.Hint,
-}
+};
 
 export const diagnosticAdaptor: Adaptor<
   lsp.Diagnostic,
   monaco.editor.IMarkerData
 > = {
   from: function (_m: monaco.editor.IMarkerData): lsp.Diagnostic {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (diag: lsp.Diagnostic): monaco.editor.IMarkerData {
     return {
@@ -67,21 +67,21 @@ export const diagnosticAdaptor: Adaptor<
       endColumn: diag.range.end.character + 1,
       message: diag.message,
       severity: severityMap[diag.severity ?? lsp.DiagnosticSeverity.Error],
-    }
+    };
   },
-}
+};
 
 export const positionAdaptor: Adaptor<lsp.Position, monaco.Position> = {
   from: function (m: monaco.Position): lsp.Position {
     return {
       line: m.lineNumber - 1,
       character: m.column - 1,
-    }
+    };
   },
   to: function (l: lsp.Position): monaco.Position {
-    return new monaco.Position(l.line + 1, l.character + 1)
+    return new monaco.Position(l.line + 1, l.character + 1);
   },
-}
+};
 
 const completionTriggerKindMap = {
   [monaco.languages.CompletionTriggerKind.Invoke]:
@@ -90,7 +90,7 @@ const completionTriggerKindMap = {
     lsp.CompletionTriggerKind.TriggerCharacter,
   [monaco.languages.CompletionTriggerKind.TriggerForIncompleteCompletions]:
     lsp.CompletionTriggerKind.TriggerForIncompleteCompletions,
-}
+};
 
 export const completionContextAdaptor: Adaptor<
   lsp.CompletionContext,
@@ -102,50 +102,50 @@ export const completionContextAdaptor: Adaptor<
     return {
       triggerCharacter: context.triggerCharacter,
       triggerKind: completionTriggerKindMap[context.triggerKind],
-    }
+    };
   },
   to: function (_l: lsp.CompletionContext): monaco.languages.CompletionContext {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
-}
+};
 
 const markupAdaptor: Adaptor<lsp.MarkupContent, monaco.IMarkdownString> = {
   from: function (m: monaco.IMarkdownString): lsp.MarkupContent {
     return {
       kind: lsp.MarkupKind.Markdown,
       value: m.value,
-    }
+    };
   },
   to: function (l: lsp.MarkupContent): monaco.IMarkdownString {
-    return l
+    return l;
   },
-}
+};
 
 const markedStringAdaptor: Adaptor<lsp.MarkedString, monaco.IMarkdownString> = {
   from: function (m: monaco.IMarkdownString): lsp.MarkedString {
-    return m.value
+    return m.value;
   },
   to: function (l: lsp.MarkedString): monaco.IMarkdownString {
     return {
-      value: typeof l === 'string' ? l : l.value,
-    }
+      value: typeof l === "string" ? l : l.value,
+    };
   },
-}
+};
 
 const singleEditAdaptor: Adaptor<
   lsp.TextEdit,
   monaco.editor.ISingleEditOperation
 > = {
   from: function (_m: monaco.editor.ISingleEditOperation): lsp.TextEdit {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (edit: lsp.TextEdit): monaco.editor.ISingleEditOperation {
     return {
       range: rangeAdaptor.to(edit.range),
       text: edit.newText,
-    }
+    };
   },
-}
+};
 
 const completionItemKindMap = {
   [lsp.CompletionItemKind.Text]: monaco.languages.CompletionItemKind.Text,
@@ -183,29 +183,30 @@ const completionItemKindMap = {
     monaco.languages.CompletionItemKind.Operator,
   [lsp.CompletionItemKind.TypeParameter]:
     monaco.languages.CompletionItemKind.TypeParameter,
-}
+};
 
 const completionItemAdaptor: Adaptor<
   lsp.CompletionItem,
   monaco.languages.CompletionItem
 > = {
   from: function (_m: monaco.languages.CompletionItem): lsp.CompletionItem {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (
     item: lsp.CompletionItem,
     range: monaco.IRange,
   ): monaco.languages.CompletionItem {
-    const kind = completionItemKindMap[item.kind ?? lsp.CompletionItemKind.Text]
-    const insertText = item.insertText ?? item.label
+    const kind =
+      completionItemKindMap[item.kind ?? lsp.CompletionItemKind.Text];
+    const insertText = item.insertText ?? item.label;
     const documentation = item.documentation
       ? lsp.MarkupContent.is(item.documentation)
         ? markupAdaptor.to(item.documentation)
         : item.documentation
-      : undefined
+      : undefined;
     const additionalTextEdits = item.additionalTextEdits
       ? item.additionalTextEdits.map(singleEditAdaptor.to)
-      : undefined
+      : undefined;
     return {
       ...item,
       kind,
@@ -214,9 +215,9 @@ const completionItemAdaptor: Adaptor<
       range,
       additionalTextEdits,
       command: undefined,
-    }
+    };
   },
-}
+};
 
 export const completionListAdaptor: Adaptor<
   lsp.CompletionList | lsp.CompletionItem[],
@@ -225,43 +226,43 @@ export const completionListAdaptor: Adaptor<
   from: function (
     _m: monaco.languages.CompletionList,
   ): lsp.CompletionList | lsp.CompletionItem[] {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (
     completions: lsp.CompletionList | lsp.CompletionItem[],
     range: monaco.IRange,
   ): monaco.languages.CompletionList {
-    const items = Array.isArray(completions) ? completions : completions.items
+    const items = Array.isArray(completions) ? completions : completions.items;
     return {
-      suggestions: items.map(i => completionItemAdaptor.to(i, range)),
-    }
+      suggestions: items.map((i) => completionItemAdaptor.to(i, range)),
+    };
   },
-}
+};
 
 export const hoverAdaptor: Adaptor<lsp.Hover, monaco.languages.Hover> = {
   from: function (_m: monaco.languages.Hover): lsp.Hover {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (hover: lsp.Hover): monaco.languages.Hover {
-    const range = hover.range ? rangeAdaptor.to(hover.range) : undefined
+    const range = hover.range ? rangeAdaptor.to(hover.range) : undefined;
     if (Array.isArray(hover.contents)) {
       return {
         range,
         contents: hover.contents.map(markedStringAdaptor.to),
-      }
+      };
     } else if (lsp.MarkedString.is(hover.contents)) {
       return {
         range,
         contents: [markedStringAdaptor.to(hover.contents)],
-      }
+      };
     } else {
       return {
         range,
         contents: [markupAdaptor.to(hover.contents)],
-      }
+      };
     }
   },
-}
+};
 
 export const formattingOptionsAdaptor: Adaptor<
   lsp.FormattingOptions,
@@ -273,25 +274,25 @@ export const formattingOptionsAdaptor: Adaptor<
     return {
       insertSpaces: m.insertSpaces,
       tabSize: m.tabSize,
-    }
+    };
   },
   to: function (_l: lsp.FormattingOptions): monaco.languages.FormattingOptions {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
-}
+};
 
 export const textEditAdaptor: Adaptor<lsp.TextEdit, monaco.languages.TextEdit> =
   {
     from: function (_m: monaco.languages.TextEdit): lsp.TextEdit {
-      throw new Error('Function not implemented.')
+      throw new Error("Function not implemented.");
     },
     to: function (l: lsp.TextEdit): monaco.languages.TextEdit {
       return {
         range: rangeAdaptor.to(l.range),
         text: l.newText,
-      }
+      };
     },
-  }
+  };
 
 const fromSignatureHelpTriggerKindMap = {
   [monaco.languages.SignatureHelpTriggerKind.Invoke]:
@@ -300,7 +301,7 @@ const fromSignatureHelpTriggerKindMap = {
     lsp.SignatureHelpTriggerKind.ContentChange,
   [monaco.languages.SignatureHelpTriggerKind.TriggerCharacter]:
     lsp.SignatureHelpTriggerKind.TriggerCharacter,
-}
+};
 
 const toSignatureHelpTriggerKindMap = {
   [lsp.SignatureHelpTriggerKind.Invoked]:
@@ -309,7 +310,7 @@ const toSignatureHelpTriggerKindMap = {
     monaco.languages.SignatureHelpTriggerKind.TriggerCharacter,
   [lsp.SignatureHelpTriggerKind.ContentChange]:
     monaco.languages.SignatureHelpTriggerKind.ContentChange,
-}
+};
 
 export const signatureHelpContextAdaptor: Adaptor<
   lsp.SignatureHelpContext,
@@ -322,7 +323,7 @@ export const signatureHelpContextAdaptor: Adaptor<
       isRetrigger: m.isRetrigger,
       triggerKind: fromSignatureHelpTriggerKindMap[m.triggerKind],
       triggerCharacter: m.triggerCharacter,
-    }
+    };
   },
   to: function (
     l: lsp.SignatureHelpContext,
@@ -334,9 +335,9 @@ export const signatureHelpContextAdaptor: Adaptor<
         ? signatureHelpAdaptor.to(l.activeSignatureHelp)
         : undefined,
       triggerCharacter: l.triggerCharacter,
-    }
+    };
   },
-}
+};
 
 const ParameterInformationAdapter: Adaptor<
   lsp.ParameterInformation,
@@ -346,45 +347,45 @@ const ParameterInformationAdapter: Adaptor<
     m: monaco.languages.ParameterInformation,
   ): lsp.ParameterInformation {
     if (m.documentation) {
-      if (typeof m.documentation === 'string') {
+      if (typeof m.documentation === "string") {
         return {
           label: m.label,
           documentation: m.documentation,
-        }
+        };
       } else {
         return {
           label: m.label,
           documentation: markupAdaptor.from(m.documentation),
-        }
+        };
       }
     } else {
       return {
         label: m.label,
-      }
+      };
     }
   },
   to: function (
     l: lsp.ParameterInformation,
   ): monaco.languages.ParameterInformation {
     if (l.documentation) {
-      if (typeof l.documentation === 'string') {
+      if (typeof l.documentation === "string") {
         return {
           label: l.label,
           documentation: l.documentation,
-        }
+        };
       } else {
         return {
           label: l.label,
           documentation: markupAdaptor.to(l.documentation),
-        }
+        };
       }
     } else {
       return {
         label: l.label,
-      }
+      };
     }
   },
-}
+};
 
 const SignatureInformationAdaptor: Adaptor<
   lsp.SignatureInformation,
@@ -397,21 +398,21 @@ const SignatureInformationAdaptor: Adaptor<
       label: m.label,
       activeParameter: m.activeParameter,
       parameters: m.parameters.map(ParameterInformationAdapter.from),
-    }
+    };
     if (m.documentation) {
-      if (typeof m.documentation === 'string') {
+      if (typeof m.documentation === "string") {
         return {
           ...base,
           documentation: m.documentation,
-        }
+        };
       } else {
         return {
           ...base,
           documentation: markupAdaptor.from(m.documentation),
-        }
+        };
       }
     } else {
-      return base
+      return base;
     }
   },
   to: function (
@@ -424,9 +425,9 @@ const SignatureInformationAdaptor: Adaptor<
         : [],
       activeParameter: l.activeParameter,
       documentation: l.documentation,
-    }
+    };
   },
-}
+};
 
 export const signatureHelpAdaptor: Adaptor<
   lsp.SignatureHelp,
@@ -437,16 +438,16 @@ export const signatureHelpAdaptor: Adaptor<
       signatures: m.signatures.map(SignatureInformationAdaptor.from),
       activeParameter: m.activeParameter,
       activeSignature: m.activeSignature,
-    }
+    };
   },
   to: function (l: lsp.SignatureHelp): monaco.languages.SignatureHelp {
     return {
       activeParameter: l.activeParameter ?? 0,
       activeSignature: l.activeSignature ?? 0,
       signatures: l.signatures.map(SignatureInformationAdaptor.to),
-    }
+    };
   },
-}
+};
 
 export const locationAdaptor: Adaptor<lsp.Location, monaco.languages.Location> =
   {
@@ -454,15 +455,15 @@ export const locationAdaptor: Adaptor<lsp.Location, monaco.languages.Location> =
       return {
         range: rangeAdaptor.from(m.range),
         uri: m.uri.toString(),
-      }
+      };
     },
     to: function (l: lsp.Location): monaco.languages.Location {
       return {
         range: rangeAdaptor.to(l.range),
         uri: monaco.Uri.parse(l.uri),
-      }
+      };
     },
-  }
+  };
 
 export const definitionAdaptor: Adaptor<
   lsp.Definition,
@@ -470,19 +471,19 @@ export const definitionAdaptor: Adaptor<
 > = {
   from: function (m: monaco.languages.Definition): lsp.Definition {
     if (Array.isArray(m)) {
-      return m.map(locationAdaptor.from)
+      return m.map(locationAdaptor.from);
     } else {
-      return locationAdaptor.from(m)
+      return locationAdaptor.from(m);
     }
   },
   to: function (l: lsp.Definition): monaco.languages.Definition {
     if (lsp.Location.is(l)) {
-      return locationAdaptor.to(l)
+      return locationAdaptor.to(l);
     } else {
-      return l.map(locationAdaptor.to)
+      return l.map(locationAdaptor.to);
     }
   },
-}
+};
 
 export const prepareRenameResultAdaptor: Adaptor<
   lsp.PrepareRenameResult,
@@ -491,7 +492,7 @@ export const prepareRenameResultAdaptor: Adaptor<
   from: function (
     _m: monaco.languages.RenameLocation & monaco.languages.Rejection,
   ): lsp.PrepareRenameResult {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (
     l: lsp.PrepareRenameResult,
@@ -499,50 +500,50 @@ export const prepareRenameResultAdaptor: Adaptor<
     defaultWord: string,
   ): monaco.languages.RenameLocation & monaco.languages.Rejection {
     if (lsp.Range.is(l)) {
-      const range = rangeAdaptor.to(l)
+      const range = rangeAdaptor.to(l);
       return {
         range,
         text: defaultWord,
-      }
-    } else if ('range' in l) {
+      };
+    } else if ("range" in l) {
       return {
         range: rangeAdaptor.to(l.range),
         text: l.placeholder,
-      }
+      };
     } else {
       return {
         range: defaultRange,
         text: defaultWord,
-      }
+      };
     }
   },
-}
+};
 
 export const workspaceEditAdaptor: Adaptor<
   lsp.WorkspaceEdit,
   monaco.languages.WorkspaceEdit
 > = {
   from: function (_m: monaco.languages.WorkspaceEdit): lsp.WorkspaceEdit {
-    throw new Error('Function not implemented.')
+    throw new Error("Function not implemented.");
   },
   to: function (l: lsp.WorkspaceEdit): monaco.languages.WorkspaceEdit {
-    const edits: monaco.languages.IWorkspaceTextEdit[] = []
+    const edits: monaco.languages.IWorkspaceTextEdit[] = [];
     if (l.changes) {
       for (const uri in l.changes) {
         for (const edit of l.changes[uri]) {
-          const resource = monaco.Uri.parse(uri)
-          const model = monaco.editor.getModel(resource)
-          if (model === null) continue
+          const resource = monaco.Uri.parse(uri);
+          const model = monaco.editor.getModel(resource);
+          if (model === null) continue;
           edits.push({
             resource,
             textEdit: textEditAdaptor.to(edit),
             versionId: model.getVersionId(),
-          })
+          });
         }
       }
-      return { edits }
+      return { edits };
     } else {
-      return { edits }
+      return { edits };
     }
   },
-}
+};

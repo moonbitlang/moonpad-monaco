@@ -17,8 +17,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202411150
-        version: 0.1.202411150
+        specifier: ^0.1.202411250
+        version: 0.1.202411250
+      '@moonbit/moonc-worker':
+        specifier: ^0.1.202411271
+        version: 0.1.202411271
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
@@ -41,6 +44,12 @@ importers:
         specifier: ^9.1.0
         version: 9.1.0
     devDependencies:
+      prettier:
+        specifier: ^3.4.1
+        version: 3.4.1
+      prettier-plugin-organize-imports:
+        specifier: ^4.1.0
+        version: 4.1.0(prettier@3.4.1)(typescript@5.6.3)
       typescript:
         specifier: ~5.6.2
         version: 5.6.3
@@ -332,8 +341,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@moonbit/analyzer@0.1.202411150':
-    resolution: {integrity: sha512-P7gXKh+2Rvu1hqx7Tyr/fZjAA75hkOgrHgCWeLIH4T5KRNwMLbggxDvfAjtIrLdrP6YTWRwtCz5rQT1nOqwbeQ==}
+  '@moonbit/analyzer@0.1.202411250':
+    resolution: {integrity: sha512-ILLCoqDM6gr8oum/ixtMy22sDYqFBRT0NVhpTbYuVw8y6d11D2iCsqoeP50tBzR1Vdf2ehpQqbMsr6cBk2pkiQ==}
+
+  '@moonbit/moonc-worker@0.1.202411271':
+    resolution: {integrity: sha512-Y3sjV/pH1XhEXbgbRgHACfiXfXXRzDbR3nZCcoWKlyRTkoUg/rq2TyZd66viNmVxiPsXBJtcWMCaZ0qX1tYezQ==}
 
   '@rollup/rollup-android-arm-eabi@4.27.2':
     resolution: {integrity: sha512-Tj+j7Pyzd15wAdSJswvs5CJzJNV+qqSUcr/aCD+jpQSBtXvGnV0pnrjoc8zFTe9fcKCatkpFpOO7yAzpO998HA==}
@@ -460,6 +472,21 @@ packages:
   postcss@8.4.49:
     resolution: {integrity: sha512-OCVPnIObs4N29kxTjzLfUryOkvZEq+pf8jTF0lg8E7uETuWHA+v7j3c/xJmiqpX450191LlmZfUKkXxkTry7nA==}
     engines: {node: ^10 || ^12 || >=14}
+
+  prettier-plugin-organize-imports@4.1.0:
+    resolution: {integrity: sha512-5aWRdCgv645xaa58X8lOxzZoiHAldAPChljr/MT0crXVOWTZ+Svl4hIWlz+niYSlO6ikE5UXkN1JrRvIP2ut0A==}
+    peerDependencies:
+      prettier: '>=2.0'
+      typescript: '>=2.9'
+      vue-tsc: ^2.1.0
+    peerDependenciesMeta:
+      vue-tsc:
+        optional: true
+
+  prettier@3.4.1:
+    resolution: {integrity: sha512-G+YdqtITVZmOJje6QkXQWzl3fSfMxFwm1tjTyo9exhkmWSqC4Yhd1+lug++IlR2mvRVAxEDDWYkQdeSztajqgg==}
+    engines: {node: '>=14'}
+    hasBin: true
 
   rollup@4.27.2:
     resolution: {integrity: sha512-KreA+PzWmk2yaFmZVwe6GB2uBD86nXl86OsDkt1bJS9p3vqWuEQ6HnJJ+j/mZi/q0920P99/MVRlB4L3crpF5w==}
@@ -669,7 +696,9 @@ snapshots:
   '@esbuild/win32-x64@0.24.0':
     optional: true
 
-  '@moonbit/analyzer@0.1.202411150': {}
+  '@moonbit/analyzer@0.1.202411250': {}
+
+  '@moonbit/moonc-worker@0.1.202411271': {}
 
   '@rollup/rollup-android-arm-eabi@4.27.2':
     optional: true
@@ -796,6 +825,13 @@ snapshots:
       nanoid: 3.3.7
       picocolors: 1.1.1
       source-map-js: 1.2.1
+
+  prettier-plugin-organize-imports@4.1.0(prettier@3.4.1)(typescript@5.6.3):
+    dependencies:
+      prettier: 3.4.1
+      typescript: 5.6.3
+
+  prettier@3.4.1: {}
 
   rollup@4.27.2:
     dependencies:

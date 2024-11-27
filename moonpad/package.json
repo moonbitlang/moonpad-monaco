@@ -6,14 +6,18 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "format": "prettier --write ."
   },
   "devDependencies": {
+    "prettier": "^3.4.1",
+    "prettier-plugin-organize-imports": "^4.1.0",
     "typescript": "~5.6.2",
     "vite": "^5.4.10"
   },
   "dependencies": {
-    "@moonbit/analyzer": "^0.1.202411150",
+    "@moonbit/analyzer": "^0.1.202411250",
+    "@moonbit/moonc-worker": "^0.1.202411271",
     "comlink": "^4.4.2",
     "core": "workspace:^",
     "monaco-editor-core": "^0.52.0",
@@ -21,5 +25,10 @@
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-oniguruma": "^2.0.1",
     "vscode-textmate": "^9.1.0"
+  },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-organize-imports"
+    ]
   }
 }

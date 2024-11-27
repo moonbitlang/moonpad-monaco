@@ -56,6 +56,28 @@ function generate() {
     .map((f, i) => `import file${i} from '${f}';`)
     .join('\n')
 
+  const getPkgs = prefix => {
+    const folders = fs
+      .readdirSync(path.join(core, prefix), { withFileTypes: true })
+      .filter(i => i.isDirectory() && !i.name.startsWith('.'))
+
+    const pkgs = []
+    const dirs = []
+
+    for (const f of folders) {
+      if (fs.existsSync(path.join(core, prefix, f.name, 'moon.pkg.json'))) {
+        pkgs.push(path.join(prefix, f.name))
+      } else {
+        dirs.push(f.name)
+      }
+    }
+    return [...pkgs, ...dirs.flatMap(d => getPkgs(path.join(prefix, d)))]
+  }
+
+  const corePkgs = getPkgs('')
+
+  const pkgStatement = `const corePkgs = ${JSON.stringify(corePkgs)}`
+
   const mapStatement = `const coreMap = Object.create(null)`
 
   const paths = files.map(f => path.join('/', path.relative(data, f)))
@@ -64,10 +86,11 @@ function generate() {
     .map((p, i) => `coreMap['${p}'] = file${i}`)
     .join('\n')
 
-  const exportStatement = `export {coreMap}`
+  const exportStatement = `export {coreMap, corePkgs}`
 
   const statements = [
     importStatements,
+    pkgStatement,
     mapStatement,
     assignStatements,
     exportStatement,
