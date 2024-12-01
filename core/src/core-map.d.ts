@@ -1,4 +1,5 @@
 declare const coreMap: Record<string, Uint8Array>
+declare const corePkgs: string[]
 declare function getLoadPkgsParams(
   target?: 'wasm-gc' | 'wasm' | 'js',
 ): [importPath: string, mi: Uint8Array][]

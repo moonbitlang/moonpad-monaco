@@ -1,3 +1,5 @@
+import { coreMap, corePkgs } from './core-map'
+
 function getLoadPkgsParams(target = 'wasm-gc') {
   return corePkgs.map(pkg => {
     const base = pkg.split('/').at(-1)
@@ -8,5 +10,4 @@ function getLoadPkgsParams(target = 'wasm-gc') {
   })
 }
 
-export { coreMap } from './core-map'
-export { getLoadPkgsParams }
+export { getLoadPkgsParams, coreMap, corePkgs }

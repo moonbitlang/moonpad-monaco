@@ -3,6 +3,7 @@ import * as comlink from "comlink";
 import * as core from "core";
 import mooncWorker from "../node_modules/@moonbit/moonc-worker/moonc-worker?worker";
 import * as corefs from "./core-fs";
+import moonrunWorker from "./moonrun-worker?worker";
 
 async function moonc<T>(
   callback: (moonc: comlink.Remote<any>) => Promise<T>,
@@ -68,4 +69,25 @@ async function compile(content: string): Promise<Uint8Array> {
   return wasm;
 }
 
-export { compile };
+async function run(wasm: Uint8Array): Promise<ReadableStream<Uint16Array>> {
+  const worker = new moonrunWorker();
+  worker.postMessage({ wasm });
+  return await new Promise<ReadableStream<Uint16Array>>((resolve) => {
+    worker.onmessage = (e: MessageEvent<ReadableStream<Uint16Array>>) => {
+      const stream = e.data;
+      const terminationStream = new TransformStream({
+        transform(chunk, controller) {
+          controller.enqueue(chunk);
+        },
+        flush(controller) {
+          worker.terminate();
+          controller.terminate();
+        },
+      });
+
+      resolve(stream.pipeThrough(terminationStream));
+    };
+  });
+}
+
+export { compile, run };
