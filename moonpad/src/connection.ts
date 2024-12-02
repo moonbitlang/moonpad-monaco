@@ -1,4 +1,3 @@
-import lspWorker from "@moonbit/analyzer/lsp-server?worker";
 import * as comlink from "comlink";
 import * as jsonrpc from "vscode-jsonrpc/browser";
 import * as lsp from "vscode-languageserver-protocol";
@@ -14,21 +13,20 @@ function withResolver<T>() {
 
 const [connection, connectionResolver] = withResolver<lsp.ProtocolConnection>();
 
-async function init() {
-  const worker = new lspWorker();
+async function init(lspWorker: Worker) {
   const corefs = core.CoreFs.getCoreFs();
   const comlinkChannel = new MessageChannel();
   comlink.expose({ fs: corefs, moon: {} }, comlinkChannel.port1);
-  worker.postMessage({ MOON_HOME: `${corefs.scheme}:/` }, [
+  lspWorker.postMessage({ MOON_HOME: `${corefs.scheme}:/` }, [
     comlinkChannel.port2,
   ]);
 
   const c = lsp.createProtocolConnection(
-    new jsonrpc.BrowserMessageReader(worker),
-    new jsonrpc.BrowserMessageWriter(worker),
+    new jsonrpc.BrowserMessageReader(lspWorker),
+    new jsonrpc.BrowserMessageWriter(lspWorker),
   );
   c.listen();
-  await c.trace(lsp.Trace.Verbose, console);
+  DEV: await c.trace(lsp.Trace.Verbose, console);
   await c.sendRequest(lsp.InitializeRequest.type, {
     processId: null,
     rootUri: null,

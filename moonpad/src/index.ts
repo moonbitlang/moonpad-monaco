@@ -1,1 +1,1 @@
-class MoonpadMonaco extends HTMLElement {}
+export * from "./moonbit-mode";

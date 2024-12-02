@@ -1,14 +1,18 @@
 import * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
 import * as core from "core";
-import mooncWorker from "../node_modules/@moonbit/moonc-worker/moonc-worker?worker";
 import * as corefs from "./core-fs";
-import moonrunWorker from "./moonrun-worker?worker";
+import moonrunWorker from "./moonrun-worker?worker&inline";
+
+let mooncWorkerFactory: (() => Worker) | undefined = undefined;
 
 async function moonc<T>(
   callback: (moonc: comlink.Remote<any>) => Promise<T>,
 ): Promise<T> {
-  const worker = new mooncWorker();
+  if (mooncWorkerFactory === undefined) {
+    throw new Error("must init before using moonc");
+  }
+  const worker = mooncWorkerFactory();
   const moonc = comlink.wrap<any>(worker);
   const res = await callback(moonc);
   worker.terminate();
@@ -90,4 +94,9 @@ async function run(wasm: Uint8Array): Promise<ReadableStream<Uint16Array>> {
   });
 }
 
-export { compile, run };
+function init(factory: () => Worker) {
+  if (mooncWorkerFactory !== undefined) return;
+  mooncWorkerFactory = factory;
+}
+
+export { compile, init, run };

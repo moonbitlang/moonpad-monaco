@@ -1,7 +1,16 @@
+import lspWorker from "@moonbit/analyzer/lsp-server?worker";
 import * as monaco from "monaco-editor-core";
 import editorWorker from "monaco-editor-core/esm/vs/editor/editor.worker?worker";
-import "./moonbit-mode";
+import * as moonbitMode from ".";
+import mooncWorker from "../node_modules/@moonbit/moonc-worker/moonc-worker?worker";
+import wasmUrl from "../node_modules/vscode-oniguruma/release/onig.wasm?url";
 import "./styles.css";
+
+moonbitMode.init({
+  onigWasmUrl: wasmUrl,
+  lspWorker: new lspWorker(),
+  mooncWorkerFactory: () => new mooncWorker(),
+});
 
 // @ts-ignore
 self.MonacoEnvironment = {
