@@ -13,7 +13,7 @@ type initParams = {
   mooncWorkerFactory: () => Worker;
 };
 
-function init(params: initParams) {
+function init(params: initParams): typeof moon {
   const { onigWasmUrl, lspWorker, mooncWorkerFactory } = params;
   let moonbitTokensProvider: monaco.languages.TokensProvider | null = null;
 
@@ -648,7 +648,6 @@ function init(params: initParams) {
   });
 
   monaco.languages.onLanguage("moonbit", async () => {
-    moon.init(mooncWorkerFactory);
     await connection.init(lspWorker);
     const c = await connection.connection;
     c.onNotification(lsp.PublishDiagnosticsNotification.type, (params) => {
@@ -674,18 +673,6 @@ function init(params: initParams) {
         },
         contentChanges: e.changes.map(adaptor.contentChangeAdaptor.from),
       });
-      (async () => {
-        const content = model.getValue();
-        const wasm = await moon.compile(content);
-        const stream = await moon.run(wasm);
-        stream.pipeThrough(new TextDecoderStream("utf-16")).pipeTo(
-          new WritableStream({
-            write(chunk) {
-              console.log(chunk);
-            },
-          }),
-        );
-      })();
     });
     await c.sendNotification(lsp.DidOpenTextDocumentNotification.type, {
       textDocument: {
@@ -859,6 +846,8 @@ function init(params: initParams) {
     { language: "moonbit" },
     referenceProvider,
   );
+  moon.init(mooncWorkerFactory);
+  return moon;
 }
 
 export { init };
