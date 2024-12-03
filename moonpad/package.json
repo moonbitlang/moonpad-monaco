@@ -1,5 +1,5 @@
 {
-  "name": "moonpad",
+  "name": "moonpad-monaco",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -9,12 +9,23 @@
     "preview": "vite preview",
     "format": "prettier --write ."
   },
+  "exports": {
+    ".": {
+      "default": "./dist/moonpad-monaco.js",
+      "types": "./dist/moonpad-monaco.d.ts"
+    },
+    "./umd": {
+      "default": "./dist/moonpad-monaco.umd.js",
+      "types": "./dist/moonpad-monaco.d.ts"
+    }
+  },
   "devDependencies": {
     "core": "workspace:^",
     "prettier": "^3.4.1",
     "prettier-plugin-organize-imports": "^4.1.0",
     "typescript": "~5.6.3",
-    "vite": "^5.4.11"
+    "vite": "^5.4.11",
+    "vite-plugin-dts": "^4.3.0"
   },
   "dependencies": {
     "@moonbit/analyzer": "^0.1.202412020",
