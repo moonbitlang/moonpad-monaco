@@ -33,17 +33,39 @@ fn main {
   'moonbit',
 )
 
+function lineTransformStream() {
+  let buffer = ''
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += chunk
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? buffer
+      for (const line of lines) {
+        controller.enqueue(line)
+      }
+    },
+    flush(controller) {
+      if (buffer.length > 0) {
+        controller.enqueue(buffer)
+      }
+    },
+  })
+}
+
 model.onDidChangeContent(async () => {
   const content = model.getValue()
   const wasm = await moon.compile(content)
   const stream = await moon.run(wasm)
-  stream.pipeThrough(new TextDecoderStream('utf-16')).pipeTo(
-    new WritableStream({
-      write(chunk) {
-        console.log(chunk)
-      },
-    }),
-  )
+  stream
+    .pipeThrough(new TextDecoderStream('utf-16'))
+    .pipeThrough(lineTransformStream())
+    .pipeTo(
+      new WritableStream({
+        write(chunk) {
+          console.log(chunk)
+        },
+      }),
+    )
 })
 
 monaco.editor.create(document.getElementById('app')!, { model })
