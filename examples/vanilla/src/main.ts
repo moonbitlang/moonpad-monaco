@@ -54,18 +54,27 @@ function lineTransformStream() {
 
 model.onDidChangeContent(async () => {
   const content = model.getValue()
-  const wasm = await moon.compile(content)
-  const stream = await moon.run(wasm)
-  stream
-    .pipeThrough(new TextDecoderStream('utf-16'))
-    .pipeThrough(lineTransformStream())
-    .pipeTo(
-      new WritableStream({
-        write(chunk) {
-          console.log(chunk)
-        },
-      }),
-    )
+  const result = await moon.compile(content)
+  switch (result.kind) {
+    case 'success': {
+      const wasm = result.wasm
+      const stream = await moon.run(wasm)
+      stream
+        .pipeThrough(new TextDecoderStream('utf-16'))
+        .pipeThrough(lineTransformStream())
+        .pipeTo(
+          new WritableStream({
+            write(chunk) {
+              console.log(chunk)
+            },
+          }),
+        )
+      return
+    }
+    case 'error': {
+      console.error(result.diagnostics)
+    }
+  }
 })
 
 monaco.editor.create(document.getElementById('app')!, { model })

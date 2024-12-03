@@ -4,6 +4,22 @@ import * as core from "core";
 import * as corefs from "./core-fs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 
+type Position = {
+  line: number;
+  col: number;
+};
+
+type Diagnostic = {
+  level: "warning" | "error";
+  loc: {
+    path: string;
+    start: Position;
+    end: Position;
+  };
+  message: string;
+  error_code: number;
+};
+
 let mooncWorkerFactory: (() => Worker) | undefined = undefined;
 
 async function moonc<T>(
@@ -35,7 +51,17 @@ function getStdMiFiles(): [string, Uint8Array][] {
   return core.getLoadPkgsParams();
 }
 
-async function compile(content: string): Promise<Uint8Array> {
+type CompileResult =
+  | {
+      kind: "success";
+      wasm: Uint8Array;
+    }
+  | {
+      kind: "error";
+      diagnostics: Diagnostic[];
+    };
+
+async function compile(content: string): Promise<CompileResult> {
   const mbtFiles: [string, string][] = [["main.mbt", content]];
   const miFiles: [string, Uint8Array][] = [];
   const stdMiFiles = getStdMiFiles();
@@ -47,11 +73,14 @@ async function compile(content: string): Promise<Uint8Array> {
     pkg: "main",
     pkgSources: [],
     isMain: true,
-    errorFormat: "human",
+    errorFormat: "json",
   });
 
   if (core === undefined || mi === undefined) {
-    throw new Error(diagnostics.join("\n"));
+    return {
+      kind: "error",
+      diagnostics: diagnostics.map((d) => JSON.parse(d) as Diagnostic),
+    };
   }
 
   const coreCoreUri =
@@ -70,7 +99,10 @@ async function compile(content: string): Promise<Uint8Array> {
     target: "wasm-gc",
     testMode: false,
   });
-  return wasm;
+  return {
+    kind: "success",
+    wasm,
+  };
 }
 
 async function run(wasm: Uint8Array): Promise<ReadableStream<Uint16Array>> {
