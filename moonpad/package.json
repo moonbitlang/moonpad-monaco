@@ -1,14 +1,17 @@
 {
-  "name": "moonpad-monaco",
-  "private": true,
-  "version": "0.0.0",
+  "name": "@moonbit/moonpad-monaco",
+  "version": "0.1.202412020",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "format": "prettier --write ."
+    "format": "prettier --write .",
+    "prepublish": "tsc && vite build"
   },
+  "files": [
+    "dist"
+  ],
   "exports": {
     ".": {
       "default": "./dist/moonpad-monaco.js",
