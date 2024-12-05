@@ -23,24 +23,49 @@ monaco.editor.setTheme("light-plus");
 
 const model = monaco.editor.createModel(
   `
-fn add(a: Int, b: Int) -> Int {
+pub fn add(a: Int, b: Int) -> Int {
   a + b
 }
-fn main {
-  println("hello")
-  println(add(1, 2))
-}`,
+`,
   "moonbit",
 );
 
+function lineTransformStream() {
+  let buffer = "";
+  return new TransformStream({
+    transform(chunk, controller) {
+      buffer += chunk;
+      const lines = buffer.split("\n");
+      buffer = lines.pop() ?? buffer;
+      for (const line of lines) {
+        controller.enqueue(line);
+      }
+    },
+    flush(controller) {
+      if (buffer.length > 0) {
+        controller.enqueue(buffer);
+      }
+    },
+  });
+}
+
 model.onDidChangeContent(async () => {
   const content = model.getValue();
-  const result = await moon.compile(content);
+  const result = await moon.compile({
+    libContents: [content],
+    testContents: [
+      `
+test {
+  println(@lib.add(1, 2))
+}
+    `,
+    ],
+  });
   switch (result.kind) {
     case "success": {
       const wasm = result.wasm;
-      const stream = await moon.run(wasm);
-      stream.pipeThrough(new TextDecoderStream("utf-16")).pipeTo(
+      const stream = await moon.test(wasm);
+      stream.pipeTo(
         new WritableStream({
           write(chunk) {
             console.log(chunk);
@@ -57,9 +82,38 @@ model.onDidChangeContent(async () => {
 
 monaco.editor.create(document.getElementById("app")!, { model });
 
-monaco.editor.create(document.getElementById("app2")!, {
-  value: `fn main {
+const model2 = monaco.editor.createModel(
+  `fn main {
   println("hello")
 }`,
-  language: "moonbit",
+  "moonbit",
+);
+
+model2.onDidChangeContent(async () => {
+  const content = model2.getValue();
+  const result = await moon.compile({
+    libContents: [content],
+  });
+  switch (result.kind) {
+    case "success": {
+      const wasm = result.wasm;
+      const stream = await moon.run(wasm);
+      stream
+        .pipeThrough(new TextDecoderStream("utf-16"))
+        .pipeThrough(lineTransformStream())
+        .pipeTo(
+          new WritableStream({
+            write(chunk) {
+              console.log(chunk);
+            },
+          }),
+        );
+      return;
+    }
+    case "error": {
+      console.error(result.diagnostics);
+    }
+  }
 });
+
+monaco.editor.create(document.getElementById("app2")!, { model: model2 });

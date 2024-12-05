@@ -54,7 +54,7 @@ function lineTransformStream() {
 
 model.onDidChangeContent(async () => {
   const content = model.getValue()
-  const result = await moon.compile(content)
+  const result = await moon.compile({ libContents: [content] })
   switch (result.kind) {
     case 'success': {
       const wasm = result.wasm
