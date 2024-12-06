@@ -14,20 +14,21 @@
   ],
   "exports": {
     ".": {
-      "default": "./dist/moonpad-monaco.js",
+      "import": "./dist/moonpad-monaco.js",
       "types": "./dist/moonpad-monaco.d.ts"
     },
     "./umd": {
-      "default": "./dist/moonpad-monaco.umd.js",
+      "require": "./dist/moonpad-monaco.umd.js",
       "types": "./dist/moonpad-monaco.d.ts"
     }
   },
   "devDependencies": {
+    "@types/node": "^22.10.1",
     "core": "workspace:^",
-    "prettier": "^3.4.1",
+    "prettier": "^3.4.2",
     "prettier-plugin-organize-imports": "^4.1.0",
-    "typescript": "~5.6.3",
-    "vite": "^5.4.11",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.2",
     "vite-plugin-dts": "^4.3.0"
   },
   "dependencies": {

@@ -19,12 +19,22 @@ function isDotFile(filePath) {
   return filePath.split(path.sep).some(s => s !== '.' && s.startsWith('.'))
 }
 
+/**
+ *
+ * @param {string} filePath
+ * @returns {boolean}
+ */
+function isJsMi(filePath) {
+  return filePath.includes('/target/js') && filePath.endsWith('.mi')
+}
+
 function generate() {
   const cwd = process.cwd()
   const data = path.join(cwd, 'data')
   const core = path.join(data, 'lib', 'core')
   cp.execSync('moon clean', { cwd: core, encoding: 'utf8' })
-  cp.execSync('moon bundle', { cwd: core, encoding: 'utf8' })
+  cp.execSync('moon bundle --target wasm-gc', { cwd: core, encoding: 'utf8' })
+  cp.execSync('moon bundle --target js', { cwd: core, encoding: 'utf8' })
   const coreCore = path.join(
     core,
     'target',
@@ -51,6 +61,7 @@ function generate() {
     )
     .map(i => path.join(i.parentPath, i.name))
     .filter(f => !isDotFile(f))
+    .filter(f => !isJsMi(f))
 
   const importStatements = files
     .map((f, i) => `import file${i} from '${f}';`)

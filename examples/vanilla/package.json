@@ -16,7 +16,7 @@
     "@moonbit/analyzer": "^0.1.202412020",
     "@moonbit/moonc-worker": "^0.1.202412020",
     "monaco-editor-core": "^0.52.0",
-    "moonpad-monaco": "workspace:^",
+    "@moonbit/moonpad-monaco": "workspace:^",
     "vscode-oniguruma": "^2.0.1"
   }
 }
