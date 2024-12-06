@@ -13,10 +13,7 @@
     "vite": "^6.0.1"
   },
   "dependencies": {
-    "@moonbit/analyzer": "^0.1.202412020",
-    "@moonbit/moonc-worker": "^0.1.202412020",
     "monaco-editor-core": "^0.52.0",
-    "@moonbit/moonpad-monaco": "workspace:^",
-    "vscode-oniguruma": "^2.0.1"
+    "@moonbit/moonpad-monaco": "workspace:^"
   }
 }

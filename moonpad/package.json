@@ -20,6 +20,15 @@
     "./umd": {
       "require": "./dist/moonpad-monaco.umd.js",
       "types": "./dist/moonpad-monaco.d.ts"
+    },
+    "./moonc-worker.js": {
+      "default": "./dist/moonc-worker.js"
+    },
+    "./lsp-server.js": {
+      "default": "./dist/lsp-server.js"
+    },
+    "./onig.wasm": {
+      "default": "./dist/onig.wasm"
     }
   },
   "devDependencies": {
@@ -32,8 +41,8 @@
     "vite-plugin-dts": "^4.3.0"
   },
   "dependencies": {
-    "@moonbit/analyzer": "^0.1.202412020",
-    "@moonbit/moonc-worker": "^0.1.202412020",
+    "@moonbit/analyzer": "^0.1.202412040",
+    "@moonbit/moonc-worker": "^0.1.202412040",
     "comlink": "^4.4.2",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",

@@ -1,11 +1,30 @@
+import fs from "fs";
 import { resolve } from "path";
-import { defineConfig } from "vite";
+import { defineConfig, Plugin } from "vite";
 import dts from "vite-plugin-dts";
 
 const dropLabels = process.env.NODE_ENV === "development" ? [] : ["DEV"];
 
+const plugin: Plugin = {
+  name: "copy-worker",
+  writeBundle() {
+    fs.copyFileSync(
+      "node_modules/@moonbit/analyzer/lsp-server.js",
+      "dist/lsp-server.js",
+    );
+    fs.copyFileSync(
+      "node_modules/@moonbit/moonc-worker/moonc-worker.js",
+      "dist/moonc-worker.js",
+    );
+    fs.copyFileSync(
+      "node_modules/vscode-oniguruma/release/onig.wasm",
+      "dist/onig.wasm",
+    );
+  },
+};
+
 export default defineConfig({
-  plugins: [dts({ rollupTypes: true })],
+  plugins: [plugin, dts({ rollupTypes: true })],
   esbuild: {
     dropLabels,
   },

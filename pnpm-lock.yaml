@@ -16,25 +16,16 @@ importers:
 
   examples/vanilla:
     dependencies:
-      '@moonbit/analyzer':
-        specifier: ^0.1.202412020
-        version: 0.1.202412040
-      '@moonbit/moonc-worker':
-        specifier: ^0.1.202412020
-        version: 0.1.202412040
       '@moonbit/moonpad-monaco':
         specifier: workspace:^
         version: link:../../moonpad
       monaco-editor-core:
         specifier: ^0.52.0
         version: 0.52.0
-      vscode-oniguruma:
-        specifier: ^2.0.1
-        version: 2.0.1
     devDependencies:
       typescript:
         specifier: ~5.6.2
-        version: 5.7.2
+        version: 5.6.3
       vite:
         specifier: ^6.0.1
         version: 6.0.2(@types/node@22.10.1)(terser@5.36.0)
@@ -42,10 +33,10 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202412020
+        specifier: ^0.1.202412040
         version: 0.1.202412040
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202412020
+        specifier: ^0.1.202412040
         version: 0.1.202412040
       comlink:
         specifier: ^4.4.2
@@ -722,6 +713,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.7.2:
     resolution: {integrity: sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==}
     engines: {node: '>=14.17'}
@@ -1385,6 +1381,8 @@ snapshots:
     optional: true
 
   typescript@5.4.2: {}
+
+  typescript@5.6.3: {}
 
   typescript@5.7.2: {}
 

@@ -33,8 +33,8 @@ function generate() {
   const data = path.join(cwd, 'data')
   const core = path.join(data, 'lib', 'core')
   cp.execSync('moon clean', { cwd: core, encoding: 'utf8' })
-  cp.execSync('moon bundle --target wasm-gc', { cwd: core, encoding: 'utf8' })
   cp.execSync('moon bundle --target js', { cwd: core, encoding: 'utf8' })
+  cp.execSync('moon bundle --target wasm-gc', { cwd: core, encoding: 'utf8' })
   const coreCore = path.join(
     core,
     'target',
