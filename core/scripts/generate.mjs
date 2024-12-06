@@ -43,7 +43,9 @@ function generate() {
     'bundle',
     'core.core',
   )
+  const jsCoreCore = path.join(core, 'target/js/release/bundle/core.core')
   gzip(coreCore)
+  gzip(jsCoreCore)
 
   const packagesPath = path.join(core, 'target', 'packages.json')
   const packagesJson = fs.readFileSync(packagesPath, 'utf8')
