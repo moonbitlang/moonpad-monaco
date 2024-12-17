@@ -30,25 +30,6 @@ pub fn add(a: Int, b: Int) -> Int {
   "moonbit",
 );
 
-function lineTransformStream() {
-  let buffer = "";
-  return new TransformStream({
-    transform(chunk, controller) {
-      buffer += chunk;
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? buffer;
-      for (const line of lines) {
-        controller.enqueue(line);
-      }
-    },
-    flush(controller) {
-      if (buffer.length > 0) {
-        controller.enqueue(buffer);
-      }
-    },
-  });
-}
-
 model.onDidChangeContent(async () => {
   const content = model.getValue();
   const result = await moon.compile({
@@ -63,9 +44,9 @@ test {
   });
   switch (result.kind) {
     case "success": {
-      const wasm = result.wasm;
-      const stream = await moon.test(wasm);
-      stream.pipeTo(
+      const js = result.js;
+      const stream = await moon.test(js);
+      await stream.pipeTo(
         new WritableStream({
           write(chunk) {
             console.log(chunk);
@@ -96,18 +77,15 @@ model2.onDidChangeContent(async () => {
   });
   switch (result.kind) {
     case "success": {
-      const wasm = result.wasm;
-      const stream = await moon.run(wasm);
-      stream
-        .pipeThrough(new TextDecoderStream("utf-16"))
-        .pipeThrough(lineTransformStream())
-        .pipeTo(
-          new WritableStream({
-            write(chunk) {
-              console.log(chunk);
-            },
-          }),
-        );
+      const js = result.js;
+      const stream = await moon.run(js);
+      stream.pipeTo(
+        new WritableStream({
+          write(chunk) {
+            console.log(chunk);
+          },
+        }),
+      );
       return;
     }
     case "error": {

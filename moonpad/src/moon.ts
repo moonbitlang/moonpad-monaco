@@ -58,13 +58,13 @@ async function mooncGenTestInfo(
 }
 
 function getStdMiFiles(): [string, Uint8Array][] {
-  return core.getLoadPkgsParams();
+  return core.getLoadPkgsParams("js");
 }
 
 type CompileResult =
   | {
       kind: "success";
-      wasm: Uint8Array;
+      js: Uint8Array;
     }
   | {
       kind: "error";
@@ -74,11 +74,10 @@ type CompileResult =
 type CompileParams = {
   libContents: string[];
   testContents?: string[];
-  target?: "wasm-gc" | "js";
 };
 
 async function compile(params: CompileParams): Promise<CompileResult> {
-  const { libContents, testContents = [], target = "wasm-gc" } = params;
+  const { libContents, testContents = [] } = params;
   const libInputMbtFiles: [string, string][] = libContents.map(
     (content, index) => [`${index}.mbt`, content],
   );
@@ -90,7 +89,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     mbtFiles: libInputMbtFiles,
     miFiles: libInputMiFiles,
     stdMiFiles,
-    target,
+    target: "js",
     pkg: "moonpad/lib",
     pkgSources: ["moonpad/lib:moonpad-internal:/lib"],
     isMain: !isTest,
@@ -134,7 +133,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       mbtFiles: testInputMbtFiles,
       miFiles: testInputMiFiles,
       stdMiFiles,
-      target,
+      target: "js",
       pkg: "moonpad/lib_blackbox_test",
       pkgSources: [
         "moonpad/lib:moonpad-internal:/lib",
@@ -155,13 +154,13 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     }
   }
 
-  const coreCoreUri = `moonbit-core:/lib/core/target/${target}/release/bundle/core.core`;
+  const coreCoreUri = `moonbit-core:/lib/core/target/js/release/bundle/core.core`;
   const coreCore = await corefs.CoreFs.getCoreFs().readFile(coreCoreUri);
   const coreFiles =
     testCore === undefined
       ? [coreCore, libCore]
       : [coreCore, libCore, testCore];
-  const { wasm } = await mooncLinkCore({
+  const { result } = await mooncLinkCore({
     coreFiles,
     debug: false,
     exportedFunctions: [],
@@ -174,12 +173,14 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     ],
     sourceMap: false,
     sources: {},
-    target,
+    target: "js",
     testMode: true,
+    no_opt: false,
+    stopOnMain: false,
   });
   return {
     kind: "success",
-    wasm,
+    js: result,
   };
 }
 
@@ -198,26 +199,6 @@ type TestResult = {
   test_name: string;
   message: string;
 };
-
-function lineTransformStream() {
-  let buffer = "";
-  return new TransformStream({
-    transform(chunk, controller) {
-      buffer += chunk;
-      const lines = buffer.split("\n");
-      buffer = lines.pop() ?? buffer;
-      for (const line of lines) {
-        controller.enqueue(line);
-      }
-    },
-    flush(controller) {
-      if (buffer.length > 0) {
-        controller.enqueue(buffer);
-      }
-      controller.terminate();
-    },
-  });
-}
 
 function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   let isInSection = false;
@@ -246,32 +227,28 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   return stream;
 }
 
-async function run(wasm: Uint8Array): Promise<ReadableStream<Uint16Array>> {
+async function run(js: Uint8Array): Promise<ReadableStream<string>> {
   const worker = new moonrunWorker();
-  worker.postMessage({ wasm });
-  return await new Promise<ReadableStream<Uint16Array>>((resolve) => {
-    worker.onmessage = (e: MessageEvent<ReadableStream<Uint16Array>>) => {
-      const stream = e.data;
-      const terminationStream = new TransformStream({
-        transform(chunk, controller) {
-          controller.enqueue(chunk);
-        },
-        flush(controller) {
-          worker.terminate();
-          controller.terminate();
-        },
-      });
-
-      resolve(stream.pipeThrough(terminationStream));
-    };
+  worker.postMessage(js);
+  return await new Promise<ReadableStream<string>>((resolve) => {
+    const readableStream = new ReadableStream<string>({
+      start(controller) {
+        worker.onmessage = (e: MessageEvent<string | null>) => {
+          if (e.data) {
+            controller.enqueue(e.data);
+          } else {
+            worker.terminate();
+            controller.close();
+          }
+        };
+      },
+    });
+    resolve(readableStream);
   });
 }
 
-async function test(wasm: Uint8Array): Promise<ReadableStream<TestOutput>> {
-  return (await run(wasm))
-    .pipeThrough(new TextDecoderStream("utf-16"))
-    .pipeThrough(lineTransformStream())
-    .pipeThrough(parseTestOutputTransformStream());
+async function test(js: Uint8Array): Promise<ReadableStream<TestOutput>> {
+  return (await run(js)).pipeThrough(parseTestOutputTransformStream());
 }
 
 function init(factory: () => Worker) {

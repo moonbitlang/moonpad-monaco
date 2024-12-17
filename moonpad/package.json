@@ -41,8 +41,8 @@
     "vite-plugin-dts": "^4.3.0"
   },
   "dependencies": {
-    "@moonbit/analyzer": "^0.1.202412040",
-    "@moonbit/moonc-worker": "^0.1.202412040",
+    "@moonbit/analyzer": "^0.1.202412160",
+    "@moonbit/moonc-worker": "^0.1.202412160",
     "comlink": "^4.4.2",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",

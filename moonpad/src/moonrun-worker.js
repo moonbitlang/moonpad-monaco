@@ -1,36 +1,19 @@
 self.onmessage = async (e) => {
-  const stream = await runWasm(e.data);
-  self.postMessage(stream, [stream]);
+  runJs(e.data);
 };
 
-async function runWasm(params) {
-  const { wasm } = params;
-  const stream = new ReadableStream({
-    type: "bytes",
-    async start(controller) {
-      const tag = new WebAssembly.Tag({ parameters: [] });
-      const runtime = {
-        spectest: {
-          print_char: (charCode) => {
-            controller.enqueue(new Uint16Array([charCode]));
-          },
-        },
-        exception: {
-          tag,
-          throw: () => {
-            throw new WebAssembly.Exception(tag, [], { traceStack: true });
-          },
-        },
-      };
-      const { instance } = await WebAssembly.instantiate(wasm, runtime);
-      const main = instance.exports._start;
-      if (!main) {
-        controller.close();
-        return;
-      }
-      main();
-      controller.close();
-    },
-  });
-  return stream;
+async function runJs(js) {
+  const jsUrl = URL.createObjectURL(
+    new Blob([js], {
+      type: "application/javascript",
+    }),
+  );
+  const oldLog = globalThis.console.log;
+  globalThis.console.log = (arg) => {
+    self.postMessage(arg);
+  };
+  await import(/* @vite-ignore */ jsUrl);
+  URL.revokeObjectURL(jsUrl);
+  globalThis.console.log = oldLog;
+  self.postMessage(null);
 }

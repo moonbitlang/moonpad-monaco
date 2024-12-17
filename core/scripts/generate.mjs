@@ -19,32 +19,13 @@ function isDotFile(filePath) {
   return filePath.split(path.sep).some(s => s !== '.' && s.startsWith('.'))
 }
 
-/**
- *
- * @param {string} filePath
- * @returns {boolean}
- */
-function isJsMi(filePath) {
-  return filePath.includes('/target/js') && filePath.endsWith('.mi')
-}
-
 function generate() {
   const cwd = process.cwd()
   const data = path.join(cwd, 'data')
   const core = path.join(data, 'lib', 'core')
   cp.execSync('moon clean', { cwd: core, encoding: 'utf8' })
   cp.execSync('moon bundle --target js', { cwd: core, encoding: 'utf8' })
-  cp.execSync('moon bundle --target wasm-gc', { cwd: core, encoding: 'utf8' })
-  const coreCore = path.join(
-    core,
-    'target',
-    'wasm-gc',
-    'release',
-    'bundle',
-    'core.core',
-  )
   const jsCoreCore = path.join(core, 'target/js/release/bundle/core.core')
-  gzip(coreCore)
   gzip(jsCoreCore)
 
   const packagesPath = path.join(core, 'target', 'packages.json')
@@ -53,7 +34,7 @@ function generate() {
   fs.writeFileSync(packagesPath, packagesJson.replaceAll(data, 'moonbit-core:'))
 
   const items = fs.readdirSync(core, { recursive: true, withFileTypes: true })
-  const extensions = ['mbt', 'mi', 'json']
+  const extensions = ['mi', 'json']
 
   const files = items
     .filter(
@@ -63,7 +44,7 @@ function generate() {
     )
     .map(i => path.join(i.parentPath, i.name))
     .filter(f => !isDotFile(f))
-    .filter(f => !isJsMi(f))
+    .filter(f => !f.endsWith('moon.pkg.json') && !f.endsWith('moon.mod.json'))
 
   const importStatements = files
     .map((f, i) => `import file${i} from '${f}';`)
