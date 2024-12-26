@@ -23,8 +23,12 @@ monaco.editor.setTheme("light-plus");
 
 const model = monaco.editor.createModel(
   `
-pub fn add(a: Int, b: Int) -> Int {
-  a + b
+pub fn solve(cards: Array[Int]) -> Int {
+  let mut result = 0
+  for card in cards {
+    result = result ^ card
+  }
+  result
 }
 `,
   "moonbit",
@@ -37,7 +41,13 @@ model.onDidChangeContent(async () => {
     testContents: [
       `
 test {
-  println(@lib.add(1, 2))
+  assert_eq!(@lib.solve([1, 1, 2, 2, 3, 3, 4, 5, 5]), 4);
+}
+test {
+  assert_eq!(@lib.solve([0, 1, 0, 1, 2]), 2);
+}
+test {
+  assert_eq!(@lib.solve([7, 3, 3, 7, 10]), 10);
 }
     `,
     ],
