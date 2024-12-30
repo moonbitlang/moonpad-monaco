@@ -34,7 +34,7 @@ function generate() {
   fs.writeFileSync(packagesPath, packagesJson.replaceAll(data, 'moonbit-core:'))
 
   const items = fs.readdirSync(core, { recursive: true, withFileTypes: true })
-  const extensions = ['mi', 'json']
+  const extensions = ['mi', 'json', 'mbt']
 
   const files = items
     .filter(

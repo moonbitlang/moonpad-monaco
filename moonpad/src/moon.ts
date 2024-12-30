@@ -74,12 +74,30 @@ type CompileResult =
 type CompileParams = {
   libContents: string[];
   testContents?: string[];
+  debugMain?: boolean;
 };
 
+async function bufferToDataURL(
+  buffer: Uint8Array,
+  type?: string,
+): Promise<string> {
+  // use a FileReader to generate a base64 data URI:
+  return await new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      resolve(reader.result as string);
+    };
+    reader.readAsDataURL(new Blob([buffer], { type }));
+  });
+}
+
 async function compile(params: CompileParams): Promise<CompileResult> {
-  const { libContents, testContents = [] } = params;
+  const { libContents, testContents = [], debugMain = false } = params;
   const libInputMbtFiles: [string, string][] = libContents.map(
     (content, index) => [`${index}.mbt`, content],
+  );
+  const testInputMbtFiles: [string, string][] = testContents.map(
+    (content, index) => [`${index}_test.mbt`, content],
   );
   const libInputMiFiles: [string, Uint8Array][] = [];
   const diagnostics: string[] = [];
@@ -107,10 +125,6 @@ async function compile(params: CompileParams): Promise<CompileResult> {
   }
   let testCore: Uint8Array | undefined;
   if (isTest) {
-    const testInputMbtFiles: [string, string][] = testContents.map(
-      (content, index) => [`${index}_test.mbt`, content],
-    );
-
     const testInfo = await mooncGenTestInfo({ mbtFiles: testInputMbtFiles });
     const driver = template
       .replace(
@@ -160,9 +174,23 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     testCore === undefined
       ? [coreCore, libCore]
       : [coreCore, libCore, testCore];
-  const { result } = await mooncLinkCore({
+  const sources: {
+    [key: string]: string;
+  } = {};
+  if (debugMain) {
+    for (const key in core.coreMap) {
+      if (key.endsWith(".mbt")) {
+        sources[`moonbit-core:${key}`] = new TextDecoder().decode(
+          core.coreMap[key],
+        );
+      }
+    }
+    for (const [name, content] of [...libInputMbtFiles, ...testInputMbtFiles]) {
+      sources[`moonpad-internal:/lib/${name}`] = content;
+    }
+  }
+  const { result, sourceMap } = await mooncLinkCore({
     coreFiles,
-    debug: false,
     exportedFunctions: [],
     main: isTest ? "moonpad/lib_blackbox_test" : "moonpad/lib",
     outputFormat: "wasm",
@@ -171,16 +199,30 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       "moonpad/lib:moonpad-internal:/lib",
       "moonpad/lib_blackbox_test:moonpad-internal:/lib",
     ],
-    sourceMap: false,
-    sources: {},
+    sources,
     target: "js",
-    testMode: true,
-    no_opt: false,
-    stopOnMain: false,
+    testMode: isTest,
+    sourceMap: debugMain,
+    debug: debugMain,
+    no_opt: debugMain,
+    sourceMapUrl: "%%moon-internal-to-be-replaced.map%%",
+    stopOnMain: debugMain,
   });
+  let js = result;
+  if (sourceMap !== undefined) {
+    const sourceMapUrl = await bufferToDataURL(
+      new TextEncoder().encode(sourceMap),
+      "application/json",
+    );
+    js = new TextEncoder().encode(
+      new TextDecoder("utf8")
+        .decode(result)
+        .replace("%%moon-internal-to-be-replaced.map%%", sourceMapUrl),
+    );
+  }
   return {
     kind: "success",
-    js: result,
+    js,
   };
 }
 

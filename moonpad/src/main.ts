@@ -51,6 +51,7 @@ test {
 }
     `,
     ],
+    debugMain: true,
   });
   switch (result.kind) {
     case "success": {
@@ -74,8 +75,14 @@ test {
 monaco.editor.create(document.getElementById("app")!, { model });
 
 const model2 = monaco.editor.createModel(
-  `fn main {
+  `
+fn add(a: Int, b: Int) -> Int {
+  a + b
+}
+
+fn main {
   println("hello")
+  add(1, 2) |> println
 }`,
   "moonbit",
 );
@@ -84,6 +91,7 @@ model2.onDidChangeContent(async () => {
   const content = model2.getValue();
   const result = await moon.compile({
     libContents: [content],
+    debugMain: true,
   });
   switch (result.kind) {
     case "success": {
