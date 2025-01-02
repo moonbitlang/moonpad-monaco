@@ -77,8 +77,9 @@ monaco.editor.create(document.getElementById("app")!, { model });
 const model2 = monaco.editor.createModel(
   `
 fn main {
-  println("hello")
-  // ...
+  let a = 1
+  let b = a + 2
+  println(a + b)
 }`,
   "moonbit",
 );
@@ -88,6 +89,37 @@ model2.onDidChangeContent(async () => {
   const result = await moon.compile({
     libContents: [content],
     // debugMain: true,
+    // enableValueTracing: true,
+  });
+  switch (result.kind) {
+    case "success": {
+      const js = result.js;
+      try {
+        const stream = moon.run(js);
+        await stream.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              console.log(chunk);
+            },
+          }),
+        );
+      } catch (e) {
+        console.error("Error running moonbit");
+        console.error(e);
+      }
+      return;
+    }
+    case "error": {
+      console.error(result.diagnostics);
+    }
+  }
+});
+
+monaco.editor.registerCommand("moonbit-lsp/trace-main", async () => {
+  const content = model2.getValue();
+  const result = await moon.compile({
+    libContents: [content],
+    enableValueTracing: true,
   });
   switch (result.kind) {
     case "success": {

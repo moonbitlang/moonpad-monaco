@@ -75,6 +75,7 @@ type CompileParams = {
   libContents: string[];
   testContents?: string[];
   debugMain?: boolean;
+  enableValueTracing?: boolean;
 };
 
 async function bufferToDataURL(
@@ -92,7 +93,12 @@ async function bufferToDataURL(
 }
 
 async function compile(params: CompileParams): Promise<CompileResult> {
-  const { libContents, testContents = [], debugMain = false } = params;
+  const {
+    libContents,
+    testContents = [],
+    debugMain = false,
+    enableValueTracing = false,
+  } = params;
   const libInputMbtFiles: [string, string][] = libContents.map(
     (content, index) => [`${index}.mbt`, content],
   );
@@ -111,6 +117,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     pkg: "moonpad/lib",
     pkgSources: ["moonpad/lib:moonpad-internal:/lib"],
     isMain: !isTest,
+    enableValueTracing,
     errorFormat: "json",
   });
 
@@ -155,6 +162,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       ],
       errorFormat: "json",
       isMain: true,
+      enableValueTracing: false,
     });
 
     testCore = testResult.core;
