@@ -269,28 +269,28 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   return stream;
 }
 
-async function run(js: Uint8Array): Promise<ReadableStream<string>> {
+function run(js: Uint8Array): ReadableStream<string> {
   const worker = new moonrunWorker();
   worker.postMessage(js);
-  return await new Promise<ReadableStream<string>>((resolve) => {
-    const readableStream = new ReadableStream<string>({
-      start(controller) {
-        worker.onmessage = (e: MessageEvent<string | null>) => {
-          if (e.data) {
-            controller.enqueue(e.data);
-          } else {
-            worker.terminate();
-            controller.close();
-          }
-        };
-      },
-    });
-    resolve(readableStream);
+  return new ReadableStream<string>({
+    start(controller) {
+      worker.onmessage = (e: MessageEvent<string | null | Error>) => {
+        if (e.data instanceof Error) {
+          worker.terminate();
+          controller.error(e.data);
+        } else if (e.data) {
+          controller.enqueue(e.data);
+        } else {
+          worker.terminate();
+          controller.close();
+        }
+      };
+    },
   });
 }
 
-async function test(js: Uint8Array): Promise<ReadableStream<TestOutput>> {
-  return (await run(js)).pipeThrough(parseTestOutputTransformStream());
+function test(js: Uint8Array): ReadableStream<TestOutput> {
+  return run(js).pipeThrough(parseTestOutputTransformStream());
 }
 
 function init(factory: () => Worker) {
