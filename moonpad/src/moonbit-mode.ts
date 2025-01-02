@@ -874,7 +874,125 @@ function init(params: initParams): typeof moon {
     codeLensProvider,
   );
   moon.init(mooncWorkerFactory);
+  const decorations = new Map<string, string[]>();
+  monaco.editor.registerCommand("moonbit-lsp/trace-main", async (_, param) => {
+    const model = monaco.editor.getModel(param.fileUri);
+    if (model === null) return;
+    const result = await moon.compile({
+      libContents: [model.getValue()],
+      enableValueTracing: true,
+    });
+    switch (result.kind) {
+      case "error": {
+        console.error(result.diagnostics);
+        return;
+      }
+      case "success": {
+        const js = result.js;
+        const stdout = moon.run(js);
+        const lines = await collect(stdout);
+        const traceResults = parseTraceOutput(lines);
+        const oldDecorations = decorations.get(model.id) ?? [];
+        const newDecorations = renderTraceResults(
+          model,
+          oldDecorations,
+          traceResults,
+        );
+        decorations.set(model.id, newDecorations);
+        let d = model.onDidChangeContent(() => {
+          decorations.set(model.id, model.deltaDecorations(newDecorations, []));
+          d.dispose();
+        });
+      }
+    }
+  });
   return moon;
+}
+
+type TraceResult = {
+  name: string;
+  value: string;
+  line: number;
+  start_column: number;
+  end_column: number;
+  hit: number;
+};
+
+const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
+
+const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
+
+async function collect(s: ReadableStream<string>): Promise<string[]> {
+  const lines: string[] = [];
+  await s.pipeTo(
+    new WritableStream({
+      write(chunk) {
+        lines.push(chunk);
+      },
+    }),
+  );
+  return lines;
+}
+
+function traceKey(trace: TraceResult): string {
+  return JSON.stringify({
+    name: trace.name,
+    line: trace.line,
+    start_column: trace.start_column,
+    end_column: trace.end_column,
+  });
+}
+
+function parseTraceOutput(lines: string[]): TraceResult[] {
+  const results = new Map<string, TraceResult>();
+  let isInTrace = false;
+  for (const line of lines) {
+    if (line === TRACING_START) {
+      isInTrace = true;
+      continue;
+    } else if (line === TRACING_END) {
+      isInTrace = false;
+      continue;
+    }
+    if (isInTrace) {
+      const j = JSON.parse(line);
+      j.line = parseInt(j.line);
+      j.start_column = parseInt(j.start_column);
+      j.end_column = parseInt(j.end_column);
+      const key = traceKey(j);
+      const res = results.get(key);
+      if (res === undefined) {
+        results.set(key, { ...j, hit: 1 });
+      } else {
+        results.set(key, { ...j, hit: res.hit + 1 });
+      }
+      continue;
+    }
+  }
+  return [...results.values()];
+}
+
+function renderTraceResults(
+  model: monaco.editor.ITextModel,
+  oldDecorations: string[],
+  results: TraceResult[],
+): string[] {
+  const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+  for (const res of results) {
+    const line = res.line;
+    const character = model.getLineLastNonWhitespaceColumn(line);
+    newDecorations.push({
+      range: new monaco.Range(line, character - 1, line, character),
+      options: {
+        after: {
+          content: `${res.name} = ${res.value}${res.hit > 1 ? ` (${res.hit} hits)` : ""}`,
+          inlineClassName: "moonbit-trace",
+          cursorStops: monaco.editor.InjectedTextCursorStops.None,
+        },
+      },
+    });
+  }
+  return model.deltaDecorations(oldDecorations, newDecorations);
 }
 
 export { init };

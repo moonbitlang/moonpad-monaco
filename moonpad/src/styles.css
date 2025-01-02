@@ -7,3 +7,8 @@
   height: 500px;
   border: 1px solid red;
 }
+
+.moonbit-trace {
+  margin-left: 1rem;
+  color: #dc1894 !important;
+}

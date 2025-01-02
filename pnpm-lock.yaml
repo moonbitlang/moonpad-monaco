@@ -17,8 +17,8 @@ importers:
   examples/vanilla:
     dependencies:
       '@moonbit/moonpad-monaco':
-        specifier: ^0.1.202412300
-        version: 0.1.202412300(monaco-editor-core@0.52.2)
+        specifier: ^0.1.202501022
+        version: 0.1.202501022(monaco-editor-core@0.52.2)
       monaco-editor-core:
         specifier: ^0.52.0
         version: 0.52.2
@@ -432,8 +432,8 @@ packages:
   '@moonbit/moonc-worker@0.1.202412310':
     resolution: {integrity: sha512-xUjqIfQOfA5PKo6PupgJw6ewxM2qOhsU0A1Nju3QR6ZZ/At2cU2yEex7N61QeQ/7JycCQR1p9EpoUdGrgohWMw==}
 
-  '@moonbit/moonpad-monaco@0.1.202412300':
-    resolution: {integrity: sha512-I4lTSazsMhsjPY93GfpcvRt1Ff2eFFr00z6gzMmN6BQ0mTuF8FS9hSgROt21y3obHbwHfrHzAZfebp1lNoaRaw==}
+  '@moonbit/moonpad-monaco@0.1.202501022':
+    resolution: {integrity: sha512-qDktFCgEZF9zpaaBO+EzmbSHs8SF7w+k6Rq0uwpp9eEZBUIw4NJlMU+m2rwwG2Gafsa9igq7YLumRsI/LHoD7Q==}
     peerDependencies:
       monaco-editor-core: ^0.52.0
 
@@ -1209,7 +1209,7 @@ snapshots:
 
   '@moonbit/moonc-worker@0.1.202412310': {}
 
-  '@moonbit/moonpad-monaco@0.1.202412300(monaco-editor-core@0.52.2)':
+  '@moonbit/moonpad-monaco@0.1.202501022(monaco-editor-core@0.52.2)':
     dependencies:
       '@moonbit/analyzer': 0.1.202412310
       '@moonbit/moonc-worker': 0.1.202412310
