@@ -11,10 +11,16 @@ type initParams = {
   onigWasmUrl: string;
   lspWorker: Worker;
   mooncWorkerFactory: () => Worker;
+  codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
 
 function init(params: initParams): typeof moon {
-  const { onigWasmUrl, lspWorker, mooncWorkerFactory } = params;
+  const {
+    onigWasmUrl,
+    lspWorker,
+    mooncWorkerFactory,
+    codeLensFilter = () => true,
+  } = params;
   let moonbitTokensProvider: monaco.languages.TokensProvider | null = null;
 
   const factory: monaco.languages.TokensProviderFactory = {
@@ -845,6 +851,27 @@ function init(params: initParams): typeof moon {
   monaco.languages.registerReferenceProvider(
     { language: "moonbit" },
     referenceProvider,
+  );
+  const codeLensProvider: monaco.languages.CodeLensProvider = {
+    async provideCodeLenses(model, _token) {
+      const c = await connection.connection;
+      const res = await c.sendRequest(lsp.CodeLensRequest.type, {
+        textDocument: { uri: model.uri.toString() },
+      } satisfies lsp.CodeLensParams);
+      if (res === null) return null;
+      const lenses = res
+        .filter((l) => !l.command?.command.startsWith("moonbit-ai"))
+        .filter(codeLensFilter)
+        .map(adaptor.codeLensAdaptor.to);
+      return {
+        dispose() {},
+        lenses,
+      };
+    },
+  };
+  monaco.languages.registerCodeLensProvider(
+    { language: "moonbit" },
+    codeLensProvider,
   );
   moon.init(mooncWorkerFactory);
   return moon;

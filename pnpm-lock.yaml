@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202412230
-        version: 0.1.202412230
+        specifier: ^0.1.202412310
+        version: 0.1.202412310
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202412230
-        version: 0.1.202412230
+        specifier: ^0.1.202412310
+        version: 0.1.202412310
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
@@ -426,11 +426,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202412230':
-    resolution: {integrity: sha512-GAJpzy0s3H9Ikh14IM6FKAOt3LNsQdwCqNsCeGlSuMCNzoko81e6cWlFHQQimUNBflap8FX4O6LfsHpxYmkapw==}
+  '@moonbit/analyzer@0.1.202412310':
+    resolution: {integrity: sha512-nf3R9PxT1VWRG/2+9fJr3oVOjF4uBreLZlYFdFKLS+tgTsaHt4zqH49dpiSarKKAPxT8jvgCm8QPLSapScLCNA==}
 
-  '@moonbit/moonc-worker@0.1.202412230':
-    resolution: {integrity: sha512-xVvNl5htkefg+RAC5i69vChr4b20g3f2M2UQzzH19nBs51fSMmaSU4bIWikCZbOd7VsFCLfuU0zBdvG0KBjDxQ==}
+  '@moonbit/moonc-worker@0.1.202412310':
+    resolution: {integrity: sha512-xUjqIfQOfA5PKo6PupgJw6ewxM2qOhsU0A1Nju3QR6ZZ/At2cU2yEex7N61QeQ/7JycCQR1p9EpoUdGrgohWMw==}
 
   '@moonbit/moonpad-monaco@0.1.202412300':
     resolution: {integrity: sha512-I4lTSazsMhsjPY93GfpcvRt1Ff2eFFr00z6gzMmN6BQ0mTuF8FS9hSgROt21y3obHbwHfrHzAZfebp1lNoaRaw==}
@@ -1205,14 +1205,14 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202412230': {}
+  '@moonbit/analyzer@0.1.202412310': {}
 
-  '@moonbit/moonc-worker@0.1.202412230': {}
+  '@moonbit/moonc-worker@0.1.202412310': {}
 
   '@moonbit/moonpad-monaco@0.1.202412300(monaco-editor-core@0.52.2)':
     dependencies:
-      '@moonbit/analyzer': 0.1.202412230
-      '@moonbit/moonc-worker': 0.1.202412230
+      '@moonbit/analyzer': 0.1.202412310
+      '@moonbit/moonc-worker': 0.1.202412310
       comlink: 4.4.2
       monaco-editor-core: 0.52.2
       vscode-jsonrpc: 8.2.1

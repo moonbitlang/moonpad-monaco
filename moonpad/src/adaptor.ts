@@ -547,3 +547,22 @@ export const workspaceEditAdaptor: Adaptor<
     }
   },
 };
+
+export const codeLensAdaptor: Adaptor<lsp.CodeLens, monaco.languages.CodeLens> =
+  {
+    from: function (): lsp.CodeLens {
+      throw new Error("Function not implemented.");
+    },
+    to: function (l: lsp.CodeLens): monaco.languages.CodeLens {
+      return {
+        range: rangeAdaptor.to(l.range),
+        command: l.command
+          ? {
+              id: l.command.command,
+              title: l.command.title,
+              arguments: l.command.arguments,
+            }
+          : undefined,
+      };
+    },
+  };
