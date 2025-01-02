@@ -17,18 +17,31 @@ importers:
   examples/vanilla:
     dependencies:
       '@moonbit/moonpad-monaco':
-        specifier: workspace:^
-        version: link:../../moonpad
+        specifier: ^0.1.202412300
+        version: 0.1.202412300(monaco-editor-core@0.52.2)
       monaco-editor-core:
         specifier: ^0.52.0
         version: 0.52.2
     devDependencies:
       typescript:
         specifier: ~5.6.2
-        version: 5.7.2
+        version: 5.6.3
       vite:
         specifier: ^6.0.1
         version: 6.0.5(@types/node@22.10.2)(terser@5.36.0)
+
+  examples/vanilla-esbuild:
+    dependencies:
+      '@moonbit/moonpad-monaco':
+        specifier: workspace:*
+        version: link:../../moonpad
+      monaco-editor-core:
+        specifier: ^0.52.0
+        version: 0.52.2
+    devDependencies:
+      esbuild:
+        specifier: ^0.24.0
+        version: 0.24.2
 
   moonpad:
     dependencies:
@@ -431,6 +444,11 @@ packages:
 
   '@moonbit/moonc-worker@0.1.202412230':
     resolution: {integrity: sha512-xVvNl5htkefg+RAC5i69vChr4b20g3f2M2UQzzH19nBs51fSMmaSU4bIWikCZbOd7VsFCLfuU0zBdvG0KBjDxQ==}
+
+  '@moonbit/moonpad-monaco@0.1.202412300':
+    resolution: {integrity: sha512-I4lTSazsMhsjPY93GfpcvRt1Ff2eFFr00z6gzMmN6BQ0mTuF8FS9hSgROt21y3obHbwHfrHzAZfebp1lNoaRaw==}
+    peerDependencies:
+      monaco-editor-core: ^0.52.0
 
   '@rollup/pluginutils@5.1.4':
     resolution: {integrity: sha512-USm05zrsFxYLPdWWq+K3STlWiT/3ELn3RcV5hJMghpeAIhxfsUIg6mt12CBJBInWMV4VneoV7SfGv8xIwo2qNQ==}
@@ -877,6 +895,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.7.2:
     resolution: {integrity: sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==}
     engines: {node: '>=14.17'}
@@ -1198,6 +1221,17 @@ snapshots:
   '@moonbit/analyzer@0.1.202412230': {}
 
   '@moonbit/moonc-worker@0.1.202412230': {}
+
+  '@moonbit/moonpad-monaco@0.1.202412300(monaco-editor-core@0.52.2)':
+    dependencies:
+      '@moonbit/analyzer': 0.1.202412230
+      '@moonbit/moonc-worker': 0.1.202412230
+      comlink: 4.4.2
+      monaco-editor-core: 0.52.2
+      vscode-jsonrpc: 8.2.1
+      vscode-languageserver-protocol: 3.17.5
+      vscode-oniguruma: 2.0.1
+      vscode-textmate: 9.2.0
 
   '@rollup/pluginutils@5.1.4(rollup@4.29.1)':
     dependencies:
@@ -1649,6 +1683,8 @@ snapshots:
     optional: true
 
   typescript@5.4.2: {}
+
+  typescript@5.6.3: {}
 
   typescript@5.7.2: {}
 

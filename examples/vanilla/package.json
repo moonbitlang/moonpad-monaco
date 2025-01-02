@@ -13,7 +13,7 @@
     "vite": "^6.0.1"
   },
   "dependencies": {
-    "monaco-editor-core": "^0.52.0",
-    "@moonbit/moonpad-monaco": "workspace:^"
+    "@moonbit/moonpad-monaco": "^0.1.202412300",
+    "monaco-editor-core": "^0.52.0"
   }
 }

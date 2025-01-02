@@ -76,13 +76,9 @@ monaco.editor.create(document.getElementById("app")!, { model });
 
 const model2 = monaco.editor.createModel(
   `
-fn add(a: Int, b: Int) -> Int {
-  a + b
-}
-
 fn main {
   println("hello")
-  add(1, 2) |> println
+  // ...
 }`,
   "moonbit",
 );
@@ -91,19 +87,24 @@ model2.onDidChangeContent(async () => {
   const content = model2.getValue();
   const result = await moon.compile({
     libContents: [content],
-    debugMain: true,
+    // debugMain: true,
   });
   switch (result.kind) {
     case "success": {
       const js = result.js;
-      const stream = await moon.run(js);
-      stream.pipeTo(
-        new WritableStream({
-          write(chunk) {
-            console.log(chunk);
-          },
-        }),
-      );
+      try {
+        const stream = moon.run(js);
+        await stream.pipeTo(
+          new WritableStream({
+            write(chunk) {
+              console.log(chunk);
+            },
+          }),
+        );
+      } catch (e) {
+        console.error("Error running moonbit");
+        console.error(e);
+      }
       return;
     }
     case "error": {
