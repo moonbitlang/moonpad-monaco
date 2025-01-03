@@ -672,12 +672,12 @@ function init(params: initParams): typeof moon {
 
   monaco.editor.onDidCreateModel(async (model) => {
     if (model.uri.scheme === "moonbit-core") return;
-    fs.writeFileSync(model.uri.fsPath, model.getValue(), {
+    fs.writeFileSync(model.uri.path, model.getValue(), {
       encoding: "utf8",
     });
     const c = await connection.connection;
     model.onDidChangeContent(async (e) => {
-      fs.writeFileSync(model.uri.fsPath, model.getValue(), {
+      fs.writeFileSync(model.uri.path, model.getValue(), {
         encoding: "utf8",
       });
       c.sendNotification(lsp.DidChangeTextDocumentNotification.type, {
@@ -882,12 +882,21 @@ function init(params: initParams): typeof moon {
     codeLensProvider,
   );
   moon.init(mooncWorkerFactory);
-  const decorations = new Map<string, string[]>();
   monaco.editor.registerCommand("moonbit-lsp/trace-main", async (_, param) => {
-    const model = monaco.editor.getModel(param.fileUri);
+    traceCommandFactory()(param.fileUri);
+  });
+  return moon;
+}
+
+function traceCommandFactory() {
+  const decorations = new Map<string, string[]>();
+  return async (uri: string): Promise<string | undefined> => {
+    const muri = monaco.Uri.parse(uri);
+    const model = monaco.editor.getModel(muri);
     if (model === null) return;
+    const name = muri.path.split("/").at(-1)!;
     const result = await moon.compile({
-      libUris: [model.uri.toString()],
+      libInputs: [[name, model.getValue()]],
       enableValueTracing: true,
     });
     switch (result.kind) {
@@ -897,9 +906,9 @@ function init(params: initParams): typeof moon {
       }
       case "success": {
         const js = result.js;
-        const stdout = moon.run(js);
-        const lines = await collect(stdout);
-        const traceResults = parseTraceOutput(lines);
+        const stdoutStream = moon.run(js);
+        const lines = await collect(stdoutStream);
+        const { traceResults, stdout } = parseTraceOutput(lines);
         const oldDecorations = decorations.get(model.id) ?? [];
         const newDecorations = renderTraceResults(
           model,
@@ -911,10 +920,10 @@ function init(params: initParams): typeof moon {
           decorations.set(model.id, model.deltaDecorations(newDecorations, []));
           d.dispose();
         });
+        return stdout;
       }
     }
-  });
-  return moon;
+  };
 }
 
 type TraceResult = {
@@ -951,8 +960,12 @@ function traceKey(trace: TraceResult): string {
   });
 }
 
-function parseTraceOutput(lines: string[]): TraceResult[] {
+function parseTraceOutput(lines: string[]): {
+  traceResults: TraceResult[];
+  stdout: string;
+} {
   const results = new Map<string, TraceResult>();
+  const stdoutLines: string[] = [];
   let isInTrace = false;
   for (const line of lines) {
     if (line === TRACING_START) {
@@ -974,10 +987,14 @@ function parseTraceOutput(lines: string[]): TraceResult[] {
       } else {
         results.set(key, { ...j, hit: res.hit + 1 });
       }
-      continue;
+    } else {
+      stdoutLines.push(line);
     }
   }
-  return [...results.values()];
+  return {
+    traceResults: [...results.values()],
+    stdout: stdoutLines.join("\n"),
+  };
 }
 
 function renderTraceResults(
@@ -1003,4 +1020,4 @@ function renderTraceResults(
   return model.deltaDecorations(oldDecorations, newDecorations);
 }
 
-export { init };
+export { init, traceCommandFactory };

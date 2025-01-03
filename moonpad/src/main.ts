@@ -52,9 +52,9 @@ model2.onDidChangeContent(run);
 
 async function run() {
   const result = await moon.compile({
-    libUris: [monaco.Uri.file("/a.mbt").toString()],
-    testUris: [monaco.Uri.file("/b.test.mbt").toString()],
-    debugMain: true,
+    libInputs: [["a.mbt", model.getValue()]],
+    testInputs: [["a_wbtest.mbt", model2.getValue()]],
+    debugMain: false,
   });
   switch (result.kind) {
     case "success": {

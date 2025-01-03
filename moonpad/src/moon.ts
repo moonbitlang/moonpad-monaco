@@ -1,7 +1,6 @@
 import * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
 import * as Core from "core";
-import * as monaco from "monaco-editor-core";
 import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import template from "./template.mbt?raw";
@@ -72,9 +71,11 @@ type CompileResult =
       diagnostics: Diagnostic[];
     };
 
+type Input = [name: string, content: string];
+
 type CompileParams = {
-  libUris: string[];
-  testUris?: string[];
+  libInputs: Input[];
+  testInputs?: Input[];
   debugMain?: boolean;
   enableValueTracing?: boolean;
 };
@@ -96,32 +97,17 @@ async function bufferToDataURL(
 async function compile(params: CompileParams): Promise<CompileResult> {
   const fs = mfs.MFS.getMFs();
   const {
-    libUris,
-    testUris = [],
+    libInputs,
+    testInputs = [],
     debugMain = false,
     enableValueTracing = false,
   } = params;
 
-  const libInputMbtFiles: [string, string][] = await Promise.all(
-    libUris.map(async (uri) => {
-      const name = monaco.Uri.parse(uri).fsPath.split("/").at(-1)!;
-      const content = await fs.readFile(uri);
-      return [name, new TextDecoder().decode(content)];
-    }),
-  );
-  const testInputMbtFiles: [string, string][] = await Promise.all(
-    testUris.map(async (uri) => {
-      const name = monaco.Uri.parse(uri).fsPath.split("/").at(-1)!;
-      const content = await fs.readFile(uri);
-      return [name, new TextDecoder().decode(content)];
-    }),
-  );
-
-  const isTest = testUris.length > 0;
+  const isTest = testInputs.length > 0;
   const stdMiFiles = getStdMiFiles();
   let res;
   if (isTest) {
-    const testInfo = await mooncGenTestInfo({ mbtFiles: testInputMbtFiles });
+    const testInfo = await mooncGenTestInfo({ mbtFiles: testInputs });
     const driver = template
       .replace(
         `let tests = {  } // WILL BE REPLACED
@@ -133,10 +119,10 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       .replace("{BEGIN_MOONTEST}", MOON_TEST_DELIMITER_BEGIN)
       .replace("{END_MOONTEST}", MOON_TEST_DELIMITER_END);
 
-    testInputMbtFiles.push(["driver.mbt", driver]);
+    testInputs.push(["driver.mbt", driver]);
 
     res = await mooncBuildPackage({
-      mbtFiles: [...libInputMbtFiles, ...testInputMbtFiles],
+      mbtFiles: [...libInputs, ...testInputs],
       miFiles: [],
       stdMiFiles,
       target: "js",
@@ -148,7 +134,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     });
   } else {
     res = await mooncBuildPackage({
-      mbtFiles: libInputMbtFiles,
+      mbtFiles: libInputs,
       miFiles: [],
       stdMiFiles,
       target: "js",
@@ -181,7 +167,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
         );
       }
     }
-    for (const [name, content] of [...libInputMbtFiles, ...testInputMbtFiles]) {
+    for (const [name, content] of [...libInputs, ...testInputs]) {
       sources[`moonpad:/${name}`] = content;
     }
   }

@@ -44,26 +44,9 @@ fn main {
 
 monaco.editor.create(document.getElementById('app')!, { model })
 
+const trace = moonbitMode.traceCommandFactory()
+
 model.onDidChangeContent(async () => {
-  const result = await moon.compile({
-    libUris: [monaco.Uri.file('/a.mbt').toString()],
-    debugMain: true,
-  })
-  switch (result.kind) {
-    case 'success': {
-      const js = result.js
-      const stream = await moon.run(js)
-      stream.pipeTo(
-        new WritableStream({
-          write(chunk) {
-            console.log(chunk)
-          },
-        }),
-      )
-      return
-    }
-    case 'error': {
-      console.error(result.diagnostics)
-    }
-  }
+  const stdout = await trace(monaco.Uri.file('/a.mbt').toString())
+  console.log(stdout)
 })
