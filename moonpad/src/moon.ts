@@ -1,7 +1,8 @@
 import * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
-import * as core from "core";
-import * as corefs from "./core-fs";
+import * as Core from "core";
+import * as monaco from "monaco-editor-core";
+import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import template from "./template.mbt?raw";
 
@@ -58,7 +59,7 @@ async function mooncGenTestInfo(
 }
 
 function getStdMiFiles(): [string, Uint8Array][] {
-  return core.getLoadPkgsParams("js");
+  return Core.getLoadPkgsParams("js");
 }
 
 type CompileResult =
@@ -72,8 +73,8 @@ type CompileResult =
     };
 
 type CompileParams = {
-  libContents: string[];
-  testContents?: string[];
+  libUris: string[];
+  testUris?: string[];
   debugMain?: boolean;
   enableValueTracing?: boolean;
 };
@@ -93,44 +94,32 @@ async function bufferToDataURL(
 }
 
 async function compile(params: CompileParams): Promise<CompileResult> {
+  const fs = mfs.MFS.getMFs();
   const {
-    libContents,
-    testContents = [],
+    libUris,
+    testUris = [],
     debugMain = false,
     enableValueTracing = false,
   } = params;
-  const libInputMbtFiles: [string, string][] = libContents.map(
-    (content, index) => [`${index}.mbt`, content],
+
+  const libInputMbtFiles: [string, string][] = await Promise.all(
+    libUris.map(async (uri) => {
+      const name = monaco.Uri.parse(uri).fsPath.split("/").at(-1)!;
+      const content = await fs.readFile(uri);
+      return [name, new TextDecoder().decode(content)];
+    }),
   );
-  const testInputMbtFiles: [string, string][] = testContents.map(
-    (content, index) => [`${index}_test.mbt`, content],
+  const testInputMbtFiles: [string, string][] = await Promise.all(
+    testUris.map(async (uri) => {
+      const name = monaco.Uri.parse(uri).fsPath.split("/").at(-1)!;
+      const content = await fs.readFile(uri);
+      return [name, new TextDecoder().decode(content)];
+    }),
   );
-  const libInputMiFiles: [string, Uint8Array][] = [];
-  const diagnostics: string[] = [];
-  const isTest = testContents.length > 0;
+
+  const isTest = testUris.length > 0;
   const stdMiFiles = getStdMiFiles();
-  const libResult = await mooncBuildPackage({
-    mbtFiles: libInputMbtFiles,
-    miFiles: libInputMiFiles,
-    stdMiFiles,
-    target: "js",
-    pkg: "moonpad/lib",
-    pkgSources: ["moonpad/lib:moonpad-internal:/lib"],
-    isMain: !isTest,
-    enableValueTracing,
-    errorFormat: "json",
-  });
-
-  const { core: libCore, mi: libMi } = libResult;
-  diagnostics.push(...libResult.diagnostics);
-
-  if (libCore === undefined || libMi === undefined) {
-    return {
-      kind: "error",
-      diagnostics: diagnostics.map((d) => JSON.parse(d) as Diagnostic),
-    };
-  }
-  let testCore: Uint8Array | undefined;
+  let res;
   if (isTest) {
     const testInfo = await mooncGenTestInfo({ mbtFiles: testInputMbtFiles });
     const driver = template
@@ -140,61 +129,60 @@ async function compile(params: CompileParams): Promise<CompileResult> {
   let with_args_tests = {  } // WILL BE REPLACED`,
         testInfo,
       )
-      .replace(`{PACKAGE}`, "moonpad/lib_blackbox_test")
+      .replace(`{PACKAGE}`, "moonpad/lib")
       .replace("{BEGIN_MOONTEST}", MOON_TEST_DELIMITER_BEGIN)
       .replace("{END_MOONTEST}", MOON_TEST_DELIMITER_END);
 
     testInputMbtFiles.push(["driver.mbt", driver]);
 
-    const testInputMiFiles: [string, Uint8Array][] = [
-      ["moonpad-internal:/lib:lib", libMi],
-    ];
-
-    const testResult = await mooncBuildPackage({
-      mbtFiles: testInputMbtFiles,
-      miFiles: testInputMiFiles,
+    res = await mooncBuildPackage({
+      mbtFiles: [...libInputMbtFiles, ...testInputMbtFiles],
+      miFiles: [],
       stdMiFiles,
       target: "js",
-      pkg: "moonpad/lib_blackbox_test",
-      pkgSources: [
-        "moonpad/lib:moonpad-internal:/lib",
-        "moonpad/lib_blackbox_test:moonpad-internal:/lib",
-      ],
+      pkg: "moonpad/lib",
+      pkgSources: ["moonpad/lib:moonpad:/"],
       errorFormat: "json",
       isMain: true,
-      enableValueTracing: false,
+      enableValueTracing,
     });
-
-    testCore = testResult.core;
-    diagnostics.push(...testResult.diagnostics);
-
-    if (testCore === undefined) {
-      return {
-        kind: "error",
-        diagnostics: diagnostics.map((d) => JSON.parse(d) as Diagnostic),
-      };
-    }
+  } else {
+    res = await mooncBuildPackage({
+      mbtFiles: libInputMbtFiles,
+      miFiles: [],
+      stdMiFiles,
+      target: "js",
+      pkg: "moonpad/lib",
+      pkgSources: ["moonpad/lib:moonpad:/"],
+      isMain: !isTest,
+      enableValueTracing,
+      errorFormat: "json",
+    });
+  }
+  const { core, mi, diagnostics } = res;
+  if (core === undefined || mi === undefined) {
+    return {
+      kind: "error",
+      diagnostics: diagnostics.map((d) => JSON.parse(d) as Diagnostic),
+    };
   }
 
   const coreCoreUri = `moonbit-core:/lib/core/target/js/release/bundle/core.core`;
-  const coreCore = await corefs.CoreFs.getCoreFs().readFile(coreCoreUri);
-  const coreFiles =
-    testCore === undefined
-      ? [coreCore, libCore]
-      : [coreCore, libCore, testCore];
+  const coreCore = await fs.readFile(coreCoreUri);
+  const coreFiles = [coreCore, core];
   const sources: {
     [key: string]: string;
   } = {};
   if (debugMain) {
-    for (const key in core.coreMap) {
+    for (const key in Core.coreMap) {
       if (key.endsWith(".mbt")) {
         sources[`moonbit-core:${key}`] = new TextDecoder().decode(
-          core.coreMap[key],
+          Core.coreMap[key],
         );
       }
     }
     for (const [name, content] of [...libInputMbtFiles, ...testInputMbtFiles]) {
-      sources[`moonpad-internal:/lib/${name}`] = content;
+      sources[`moonpad:/${name}`] = content;
     }
   }
   const { result, sourceMap } = await mooncLinkCore({
@@ -204,8 +192,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     outputFormat: "wasm",
     pkgSources: [
       "moonbitlang/core:moonbit-core:/lib/core",
-      "moonpad/lib:moonpad-internal:/lib",
-      "moonpad/lib_blackbox_test:moonpad-internal:/lib",
+      "moonpad/lib:moonpad:/",
     ],
     sources,
     target: "js",

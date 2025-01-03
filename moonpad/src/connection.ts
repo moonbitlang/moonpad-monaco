@@ -1,7 +1,7 @@
 import * as comlink from "comlink";
 import * as jsonrpc from "vscode-jsonrpc/browser";
 import * as lsp from "vscode-languageserver-protocol";
-import * as core from "./core-fs";
+import * as mfs from "./mfs";
 
 function withResolver<T>() {
   let resolve: (value: T) => void;
@@ -14,10 +14,10 @@ function withResolver<T>() {
 const [connection, connectionResolver] = withResolver<lsp.ProtocolConnection>();
 
 async function init(lspWorker: Worker) {
-  const corefs = core.CoreFs.getCoreFs();
+  const fs = mfs.MFS.getMFs();
   const comlinkChannel = new MessageChannel();
-  comlink.expose({ fs: corefs, moon: {} }, comlinkChannel.port1);
-  lspWorker.postMessage({ MOON_HOME: `${corefs.scheme}:/` }, [
+  comlink.expose({ fs, moon: {} }, comlinkChannel.port1);
+  lspWorker.postMessage({ MOON_HOME: `${fs.coreScheme}:/` }, [
     comlinkChannel.port2,
   ]);
 

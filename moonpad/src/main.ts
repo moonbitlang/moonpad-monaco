@@ -21,42 +21,45 @@ self.MonacoEnvironment = {
 
 monaco.editor.setTheme("light-plus");
 
+monaco.editor.createModel(`{}`, "json", monaco.Uri.file("/moon.pkg.json"));
+
 const model = monaco.editor.createModel(
   `
-pub fn solve(cards: Array[Int]) -> Int {
-  let mut result = 0
-  for card in cards {
-    result = result ^ card
-  }
-  result
+fn solve(a: Int, b: Int) -> Int {
+  println(a)
+  println(b)
+  a + b
 }
 `,
   "moonbit",
+  monaco.Uri.file("/a.mbt"),
 );
 
-model.onDidChangeContent(async () => {
-  const content = model.getValue();
+monaco.editor.create(document.getElementById("app")!, { model });
+
+const model2 = monaco.editor.createModel(
+  `test {
+  inspect!(solve(1, 2), content="3")
+}`,
+  "moonbit",
+  monaco.Uri.file("/b.test.mbt"),
+);
+
+monaco.editor.create(document.getElementById("app2")!, { model: model2 });
+
+model.onDidChangeContent(run);
+model2.onDidChangeContent(run);
+
+async function run() {
   const result = await moon.compile({
-    libContents: [content],
-    testContents: [
-      `
-test {
-  assert_eq!(@lib.solve([1, 1, 2, 2, 3, 3, 4, 5, 5]), 4);
-}
-test {
-  assert_eq!(@lib.solve([0, 1, 0, 1, 2]), 2);
-}
-test {
-  assert_eq!(@lib.solve([7, 3, 3, 7, 10]), 10);
-}
-    `,
-    ],
+    libUris: [monaco.Uri.file("/a.mbt").toString()],
+    testUris: [monaco.Uri.file("/b.test.mbt").toString()],
     debugMain: true,
   });
   switch (result.kind) {
     case "success": {
       const js = result.js;
-      const stream = await moon.test(js);
+      const stream = moon.test(js);
       await stream.pipeTo(
         new WritableStream({
           write(chunk) {
@@ -70,53 +73,4 @@ test {
       console.error(result.diagnostics);
     }
   }
-});
-
-monaco.editor.create(document.getElementById("app")!, { model });
-
-const model2 = monaco.editor.createModel(
-  `fn main {
-  let a = 1
-  let b = a + 2
-  println(a + b)
-  for i = 0; i < 10; i = i + 1 {
-    let c = b + i
-    println(i)
-  }
 }
-`,
-  "moonbit",
-);
-
-model2.onDidChangeContent(async () => {
-  const content = model2.getValue();
-  const result = await moon.compile({
-    libContents: [content],
-    // debugMain: true,
-    // enableValueTracing: true,
-  });
-  switch (result.kind) {
-    case "success": {
-      const js = result.js;
-      try {
-        const stream = moon.run(js);
-        await stream.pipeTo(
-          new WritableStream({
-            write(chunk) {
-              console.log(chunk);
-            },
-          }),
-        );
-      } catch (e) {
-        console.error("Error running moonbit");
-        console.error(e);
-      }
-      return;
-    }
-    case "error": {
-      console.error(result.diagnostics);
-    }
-  }
-});
-
-monaco.editor.create(document.getElementById("app2")!, { model: model2 });

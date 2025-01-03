@@ -4,6 +4,7 @@ import * as oniguruma from "vscode-oniguruma";
 import * as textmate from "vscode-textmate";
 import * as adaptor from "./adaptor";
 import * as connection from "./connection";
+import * as mfs from "./mfs";
 import * as moon from "./moon";
 import moonbitTmGrammar from "./moonbit.tmLanguage.json?raw";
 
@@ -15,6 +16,7 @@ type initParams = {
 };
 
 function init(params: initParams): typeof moon {
+  const fs = mfs.MFS.getMFs();
   const {
     onigWasmUrl,
     lspWorker,
@@ -670,8 +672,14 @@ function init(params: initParams): typeof moon {
 
   monaco.editor.onDidCreateModel(async (model) => {
     if (model.uri.scheme === "moonbit-core") return;
+    fs.writeFileSync(model.uri.fsPath, model.getValue(), {
+      encoding: "utf8",
+    });
     const c = await connection.connection;
-    model.onDidChangeContent((e) => {
+    model.onDidChangeContent(async (e) => {
+      fs.writeFileSync(model.uri.fsPath, model.getValue(), {
+        encoding: "utf8",
+      });
       c.sendNotification(lsp.DidChangeTextDocumentNotification.type, {
         textDocument: {
           uri: model.uri.toString(),
@@ -682,7 +690,7 @@ function init(params: initParams): typeof moon {
     });
     await c.sendNotification(lsp.DidOpenTextDocumentNotification.type, {
       textDocument: {
-        languageId: "moonbit",
+        languageId: model.getLanguageId(),
         text: model.getValue(),
         uri: model.uri.toString(),
         version: model.getVersionId(),
@@ -879,7 +887,7 @@ function init(params: initParams): typeof moon {
     const model = monaco.editor.getModel(param.fileUri);
     if (model === null) return;
     const result = await moon.compile({
-      libContents: [model.getValue()],
+      libUris: [model.uri.toString()],
       enableValueTracing: true,
     });
     switch (result.kind) {

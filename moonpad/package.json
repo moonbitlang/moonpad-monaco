@@ -43,6 +43,7 @@
   "dependencies": {
     "@moonbit/analyzer": "^0.1.202412310",
     "@moonbit/moonc-worker": "^0.1.202412310",
+    "@zenfs/core": "^1.6.16",
     "comlink": "^4.4.2",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",
