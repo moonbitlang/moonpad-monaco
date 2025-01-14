@@ -25,7 +25,7 @@ importers:
     devDependencies:
       typescript:
         specifier: ~5.6.2
-        version: 5.7.2
+        version: 5.6.3
       vite:
         specifier: ^6.0.1
         version: 6.0.7(@types/node@22.10.5)(terser@5.36.0)
@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202501060
-        version: 0.1.202501060
+        specifier: ^0.1.202501130
+        version: 0.1.202501130
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202501060
-        version: 0.1.202501060
+        specifier: ^0.1.202501130
+        version: 0.1.202501130
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -297,11 +297,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202501060':
-    resolution: {integrity: sha512-B/XMJdpnaRUvsSb5qhlcFix4QqOFD4IjBRQE1IuzXiQxTRcfg2SOWU6rzLXJfs4tg/WVVzs+prAtTvOhnY/n/w==}
+  '@moonbit/analyzer@0.1.202501130':
+    resolution: {integrity: sha512-tu63szIW+ideZbqSY4mvIh1lWcss1QmnacrhI67ijfUt5dZflewQnSWjbTObzfJG0wQAqkuO7nAcX1NiQHOVOw==}
 
-  '@moonbit/moonc-worker@0.1.202501060':
-    resolution: {integrity: sha512-1qBd+Wx8h+TMiO2+VtgwduUkT7AzTTkQ5Q7s2EF4riiFjee9yrDGVNQ0UlUvwMq6KNw2c8tvm6BiL+sxPHuozA==}
+  '@moonbit/moonc-worker@0.1.202501130':
+    resolution: {integrity: sha512-HbM1RrU6p9LTwijtwn5Y3PI/Bzy49AKzPrzFJP7CbEhLYx7qj4CHRRuzVWwFG3b0As+7qSCtPnbv92viLgM+zw==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -983,6 +983,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.6.3:
+    resolution: {integrity: sha512-hjcS1mhfuyi4WW8IWtjP7brDrG2cuDZukyrYrSauoXGNgx0S7zceP07adYkJycEr56BOUTNPzbInooiN3fn1qw==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typescript@5.7.2:
     resolution: {integrity: sha512-i5t66RHxDvVN40HfDd1PsEThGNnlMCMT3jMUuoh9/0TaqWevNontacunWyN02LA9/fIbEWlcHZcgTKb9QoaLfg==}
     engines: {node: '>=14.17'}
@@ -1281,9 +1286,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202501060': {}
+  '@moonbit/analyzer@0.1.202501130': {}
 
-  '@moonbit/moonc-worker@0.1.202501060': {}
+  '@moonbit/moonc-worker@0.1.202501130': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -1989,6 +1994,8 @@ snapshots:
     optional: true
 
   typescript@5.4.2: {}
+
+  typescript@5.6.3: {}
 
   typescript@5.7.2: {}
 
