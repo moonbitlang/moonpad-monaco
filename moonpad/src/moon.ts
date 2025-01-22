@@ -131,6 +131,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       errorFormat: "json",
       isMain: true,
       enableValueTracing,
+      noOpt: false,
     });
   } else {
     res = await mooncBuildPackage({
@@ -143,6 +144,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       isMain: !isTest,
       enableValueTracing,
       errorFormat: "json",
+      noOpt: false,
     });
   }
   const { core, mi, diagnostics } = res;
@@ -185,7 +187,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     testMode: isTest,
     sourceMap: debugMain,
     debug: debugMain,
-    no_opt: debugMain,
+    noOpt: debugMain,
     sourceMapUrl: "%%moon-internal-to-be-replaced.map%%",
     stopOnMain: debugMain,
   });
