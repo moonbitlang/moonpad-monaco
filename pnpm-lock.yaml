@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202503040
-        version: 0.1.202503040
+        specifier: ^0.1.202503181
+        version: 0.1.202503181
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202503040
-        version: 0.1.202503040
+        specifier: ^0.1.202503181
+        version: 0.1.202503181
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -297,11 +297,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202503040':
-    resolution: {integrity: sha512-oqOD/aIA3s2/Lm74o+WJ8Xf4EAQC8/aANSszHg0umlfrw/skB8f+aPuAQvlK7dyNemes5z960MkNm19iS4mGTQ==}
+  '@moonbit/analyzer@0.1.202503181':
+    resolution: {integrity: sha512-qOBe8ENTOvk0h6lhcnUeIinuQQXppWeh6QMZxyYh5SJ+MViTabjryuy9shX3b3FR8HwjHj/6zC0KKIH0ctXnZQ==}
 
-  '@moonbit/moonc-worker@0.1.202503040':
-    resolution: {integrity: sha512-rAmf8Yg5apbMC1ocIzghpEREYdRcrHvT6ObZo4Gj2c/5hmAPpoSXT7QUSGwOw/U/nU5vz3G+rz+9u65DxZx0Sg==}
+  '@moonbit/moonc-worker@0.1.202503181':
+    resolution: {integrity: sha512-g3OGNqJOIL5nsyc6dpfhi0NQ62CBb7uwfwSPqxBi3vZq0Bu5sKBtp4Ndm1JQhWRlgMOARA+9EFNtQ5zudOHIMw==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -491,6 +491,11 @@ packages:
 
   acorn@8.14.0:
     resolution: {integrity: sha512-cl669nCJTZBsL97OF4kUQm5g5hC2uihk0NxY3WENAC0TYdILVkAyHymAntgxGkl7K+t0cXIrH5siy5S4XkFycA==}
+    engines: {node: '>=0.4.0'}
+    hasBin: true
+
+  acorn@8.14.1:
+    resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
     engines: {node: '>=0.4.0'}
     hasBin: true
 
@@ -1286,9 +1291,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202503040': {}
+  '@moonbit/analyzer@0.1.202503181': {}
 
-  '@moonbit/moonc-worker@0.1.202503040': {}
+  '@moonbit/moonc-worker@0.1.202503181': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -1474,6 +1479,9 @@ snapshots:
       event-target-shim: 5.0.1
 
   acorn@8.14.0: {}
+
+  acorn@8.14.1:
+    optional: true
 
   ajv-draft-04@1.0.0(ajv@8.13.0):
     optionalDependencies:
@@ -1981,7 +1989,7 @@ snapshots:
   terser@5.36.0:
     dependencies:
       '@jridgewell/source-map': 0.3.6
-      acorn: 8.14.0
+      acorn: 8.14.1
       commander: 2.20.3
       source-map-support: 0.5.21
     optional: true
