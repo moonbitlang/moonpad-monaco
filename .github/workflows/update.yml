@@ -1,0 +1,34 @@
+name: update moonc deps
+
+on: workflow_dispatch
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+      - name: setup moonbit
+        run: |
+          curl https://cli.moonbitlang.com/install/unix.sh | bash
+          echo "$HOME/.moon/bin" >> $GITHUB_PATH
+      - run: |
+          corepack enable
+          corepack install
+          pnpm i
+      - name: update moonc deps
+        run: bash ./update.sh
+      - name: publish
+        env:
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          cd moonpad
+          node ./scripts/update-version.cjs
+          if [ -n "$(git status --porcelain)" ]; then
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .
+            git commit -m "chore: bump version [skip-ci]"
+            git push
+          fi
+          pnpm publish --access public

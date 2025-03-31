@@ -1,4 +1,0 @@
-[submodule "core/data/lib/core"]
-	path = core/data/lib/core
-	url = https://github.com/moonbitlang/core.git
-	branch = main

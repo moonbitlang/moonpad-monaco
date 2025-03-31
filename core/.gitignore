@@ -1,2 +1,3 @@
 dist
+data/lib/core
 src/core-map.js
