@@ -32,9 +32,9 @@ jobs:
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             git add .
             git commit -m "chore: bump version [skip-ci]"
+            pnpm publish --access public
             git push origin HEAD:main
           else
             echo "No update"
             exit 0
           fi
-          pnpm publish --access public
