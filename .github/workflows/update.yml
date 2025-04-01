@@ -24,8 +24,9 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          cd moonpad
-          node ./scripts/update-version.cjs
+          pushd moonpad
+            node ./scripts/update-version.cjs
+          popd moonpad
           if [ -n "$(git status --porcelain)" ]; then
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
