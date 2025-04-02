@@ -25,12 +25,15 @@ jobs:
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          pushd core
+            pnpm build
+          popd
           pushd moonpad
             pnpm version patch --no-git-tag-version -m "%s [skip ci]"
             git config --global user.name "github-actions[bot]"
             git config --global user.email "github-actions[bot]@users.noreply.github.com"
             git add .
             git commit -m "chore: bump version [skip-ci]"
-            git push origin HEAD:main
             pnpm publish --access public
+            git push origin HEAD:main
           popd
