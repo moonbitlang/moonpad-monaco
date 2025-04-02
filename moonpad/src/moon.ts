@@ -144,7 +144,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       isMain: !isTest,
       enableValueTracing,
       errorFormat: "json",
-      noOpt: false,
+      noOpt: debugMain,
     });
   }
   const { core, mi, diagnostics } = res;
