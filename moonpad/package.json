@@ -9,6 +9,7 @@
     "format": "prettier --write .",
     "prepublish": "tsc && vite build"
   },
+  "license": "Apache-2.0",
   "files": [
     "dist"
   ],
