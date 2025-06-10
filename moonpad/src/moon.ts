@@ -94,6 +94,8 @@ type CompileParams = {
   testInputs?: Input[];
   debugMain?: boolean;
   enableValueTracing?: boolean;
+  isMain?: boolean;
+  exportedFunctions?: string[];
 };
 
 async function bufferToDataURL(
@@ -117,6 +119,8 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     testInputs = [],
     debugMain = false,
     enableValueTracing = false,
+    isMain = true,
+    exportedFunctions = [],
   } = params;
 
   const isTest = testInputs.length > 0;
@@ -157,7 +161,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       target: "js",
       pkg: "moonpad/lib",
       pkgSources: ["moonpad/lib:moonpad:/"],
-      isMain: !isTest,
+      isMain,
       enableValueTracing,
       errorFormat: "json",
       noOpt: debugMain,
@@ -191,7 +195,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
   }
   const { result, sourceMap } = await mooncLinkCore({
     coreFiles,
-    exportedFunctions: [],
+    exportedFunctions,
     main: isTest ? "moonpad/lib_blackbox_test" : "moonpad/lib",
     outputFormat: "wasm",
     pkgSources: [
