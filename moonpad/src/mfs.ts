@@ -66,6 +66,8 @@ class MFS implements RemoteFileSystem {
 
   writeFileSync = fs.writeFileSync;
 
+  mkdirSync = fs.mkdirSync;
+
   async readFile(uri: string): Promise<Uint8Array> {
     const { pathname: path, protocol } = new URL(uri);
     const scheme = protocol.slice(0, -1);

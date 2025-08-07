@@ -31,8 +31,89 @@ type initParams = {
   codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
 
+function initFs(fs: mfs.MFS): void {
+  fs.mkdirSync("/target");
+  fs.mkdirSync("/src/lib", { recursive: true });
+  fs.writeFileSync(
+    "/target/packages.json",
+    `{
+  "source_dir": "/",
+  "name": "username/hello",
+  "packages": [
+    {
+      "is-main": false,
+      "is-third-party": false,
+      "root-path": "/src/lib",
+      "root": "username/hello",
+      "rel": "lib",
+      "files": {
+        "/src/lib/hello.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Debug",
+            "Release"
+          ]
+        }
+      },
+      "wbtest-files": {
+        "/src/lib/hello_wbtest.mbt": {
+          "backend": [
+            "Wasm",
+            "WasmGC",
+            "Js",
+            "Native",
+            "LLVM"
+          ],
+          "optlevel": [
+            "Debug",
+            "Release"
+          ]
+        }
+      },
+      "test-files": {},
+      "mbt-md-files": {},
+      "deps": [],
+      "wbtest-deps": [],
+      "test-deps": [],
+      "artifact": "/target/wasm-gc/release/check/lib/lib.mi"
+    }
+  ],
+  "deps": [],
+  "backend": "wasm-gc",
+  "opt_level": "release",
+  "source": "src"
+}
+`,
+    { encoding: "utf8" },
+  );
+  fs.writeFileSync(
+    "/moon.mod.json",
+    `{
+  "name": "username/hello",
+  "version": "0.1.0",
+  "readme": "README.md",
+  "repository": "",
+  "license": "Apache-2.0",
+  "keywords": [],
+  "description": "",
+  "source": "src"
+}`,
+    { encoding: "utf8" },
+  );
+  fs.writeFileSync("/src/lib/moon.pkg.json", `{}`, { encoding: "utf8" });
+  fs.writeFileSync("/src/lib/hello.mbt", "", { encoding: "utf8" });
+  fs.writeFileSync("/src/lib/hello_wbtest.mbt", "", { encoding: "utf8" });
+}
+
 function init(params: initParams): typeof moon {
   const fs = mfs.MFS.getMFs();
+  initFs(fs);
   const {
     onigWasmUrl,
     lspWorker,
@@ -688,9 +769,6 @@ function init(params: initParams): typeof moon {
 
   monaco.editor.onDidCreateModel(async (model) => {
     if (model.uri.scheme === "moonbit-core") return;
-    fs.writeFileSync(model.uri.path, model.getValue(), {
-      encoding: "utf8",
-    });
     const c = await connection.connection;
     model.onDidChangeContent(async (e) => {
       fs.writeFileSync(model.uri.path, model.getValue(), {
@@ -715,7 +793,7 @@ function init(params: initParams): typeof moon {
   });
 
   const completionProvider: monaco.languages.CompletionItemProvider = {
-    triggerCharacters: [".", "@", ":", ">", "~"],
+    triggerCharacters: [".", "@", ":", ">", "#"],
     async provideCompletionItems(model, position, context) {
       const c = await connection.connection;
       const wordInfo = model.getWordUntilPosition(position);
@@ -952,8 +1030,10 @@ type TraceResult = {
 };
 
 const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
+const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
 
 const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
+const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
 
 async function collect(s: ReadableStream<string>): Promise<string[]> {
   const lines: string[] = [];
@@ -983,6 +1063,8 @@ function parseTraceOutput(lines: string[]): {
   const results = new Map<string, TraceResult>();
   const stdoutLines: string[] = [];
   let isInTrace = false;
+  let isInTraceContent = false;
+  let lastResultKey: string | undefined = undefined;
   for (const line of lines) {
     if (line === TRACING_START) {
       isInTrace = true;
@@ -990,13 +1072,23 @@ function parseTraceOutput(lines: string[]): {
     } else if (line === TRACING_END) {
       isInTrace = false;
       continue;
+    } else if (line === TRACING_CONTENT_START) {
+      isInTraceContent = true;
+      continue;
+    } else if (line === TRACING_CONTENT_END) {
+      isInTraceContent = false;
+      continue;
     }
-    if (isInTrace) {
+    if (isInTraceContent) {
+      if (!lastResultKey) continue;
+      const value = line;
+      const res = results.get(lastResultKey);
+      if (!res) continue;
+      res.value = value;
+    } else if (isInTrace) {
       const j = JSON.parse(line);
-      j.line = parseInt(j.line);
-      j.start_column = parseInt(j.start_column);
-      j.end_column = parseInt(j.end_column);
       const key = traceKey(j);
+      lastResultKey = key;
       const res = results.get(key);
       if (res === undefined) {
         results.set(key, { ...j, hit: 1 });

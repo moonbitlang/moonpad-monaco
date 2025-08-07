@@ -5,7 +5,7 @@
   "main": "index.js",
   "private": true,
   "scripts": {
-    "postinstall": "cp -r ~/.moon/lib/core ./core/data/lib/core",
+    "postinstall": "cp -fr ~/.moon/lib/core ./core/data/lib/",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],

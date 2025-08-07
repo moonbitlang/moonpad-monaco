@@ -1,11 +1,20 @@
-#app {
-  height: 500px;
-  border: 1px solid red;
+body {
+  display: flex;
 }
 
-#app2 {
-  height: 500px;
+#test-app,
+#trace-app {
+  flex: 1;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+#normal,
+#test,
+#trace {
   border: 1px solid red;
+  flex: 1;
 }
 
 .moonbit-trace {

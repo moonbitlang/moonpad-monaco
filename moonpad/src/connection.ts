@@ -45,7 +45,13 @@ async function init(lspWorker: Worker) {
   DEV: await c.trace(lsp.Trace.Verbose, console);
   await c.sendRequest(lsp.InitializeRequest.type, {
     processId: null,
-    rootUri: null,
+    rootUri: "file:///",
+    workspaceFolders: [
+      {
+        uri: "file:///",
+        name: "MoonPad Workspace",
+      },
+    ],
     capabilities: {},
   } satisfies lsp.InitializeParams);
   await c.sendNotification(lsp.InitializedNotification.type, {});

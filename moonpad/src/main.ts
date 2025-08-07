@@ -37,39 +37,59 @@ self.MonacoEnvironment = {
 
 monaco.editor.setTheme("light-plus");
 
-monaco.editor.createModel(`{}`, "json", monaco.Uri.file("/moon.pkg.json"));
-
 const model = monaco.editor.createModel(
   `
-fn solve(a: Int, b: Int) -> Int {
+pub fn solve(a: Int, b: Int) -> Int {
   println(a)
   println(b)
   a + b
 }
 `,
   "moonbit",
-  monaco.Uri.file("/a.mbt"),
+  monaco.Uri.file("/src/lib/hello.mbt"),
 );
 
-monaco.editor.create(document.getElementById("app")!, { model });
+monaco.editor.create(document.getElementById("normal")!, { model });
 
 const model2 = monaco.editor.createModel(
   `test {
-  inspect!(solve(1, 2), content="3")
+  inspect(solve(1, 2), content="3")
 }`,
   "moonbit",
-  monaco.Uri.file("/b.test.mbt"),
+  monaco.Uri.file("/src/lib/hello_wbtest.mbt"),
 );
 
-monaco.editor.create(document.getElementById("app2")!, { model: model2 });
+monaco.editor.create(document.getElementById("test")!, { model: model2 });
+
+const trace = moonbitMode.traceCommandFactory();
+
+const traceModel = monaco.editor.createModel(
+  `fn main {
+  let a = 1
+  let b = 2
+  let c = a + b
+  println(c)
+}`,
+  "moonbit",
+  monaco.Uri.file("/trace.mbt"),
+);
+
+monaco.editor.create(document.getElementById("trace")!, {
+  model: traceModel,
+});
+
+traceModel.onDidChangeContent(async () => {
+  const stdout = await trace(traceModel.uri.toString());
+  console.log(stdout);
+});
 
 model.onDidChangeContent(run);
 model2.onDidChangeContent(run);
 
 async function run() {
   const result = await moon.compile({
-    libInputs: [["a.mbt", model.getValue()]],
-    testInputs: [["a_wbtest.mbt", model2.getValue()]],
+    libInputs: [["hello.mbt", model.getValue()]],
+    testInputs: [["hello_wbtest.mbt", model2.getValue()]],
     debugMain: false,
   });
   switch (result.kind) {
