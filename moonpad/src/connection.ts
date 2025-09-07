@@ -33,7 +33,7 @@ async function init(lspWorker: Worker) {
   const fs = mfs.MFS.getMFs();
   const comlinkChannel = new MessageChannel();
   comlink.expose({ fs, moon: {} }, comlinkChannel.port1);
-  lspWorker.postMessage({ MOON_HOME: `${fs.coreScheme}:/` }, [
+  lspWorker.postMessage({ moonbitEnv: { MOON_HOME: `${fs.coreScheme}:/` } }, [
     comlinkChannel.port2,
   ]);
 

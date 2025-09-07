@@ -17,6 +17,7 @@
 import * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
 import * as Core from "core";
+import * as vscodeUri from "vscode-uri";
 import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import template from "./template.mbt?raw";
@@ -108,7 +109,7 @@ async function bufferToDataURL(
     reader.onload = () => {
       resolve(reader.result as string);
     };
-    reader.readAsDataURL(new Blob([buffer], { type }));
+    reader.readAsDataURL(new Blob([buffer as any], { type }));
   });
 }
 
@@ -175,7 +176,9 @@ async function compile(params: CompileParams): Promise<CompileResult> {
     };
   }
 
-  const coreCoreUri = `moonbit-core:/lib/core/target/js/release/bundle/core.core`;
+  const coreCoreUri = vscodeUri.URI.parse(
+    `moonbit-core:/lib/core/target/js/release/bundle/core.core`,
+  );
   const coreCore = await fs.readFile(coreCoreUri);
   const coreFiles = [coreCore, core];
   const sources: {
