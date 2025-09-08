@@ -16,6 +16,7 @@
 
 import * as fs from "@zenfs/core";
 import * as core from "core";
+import * as vscodeUri from "vscode-uri";
 
 enum FileType {
   Unknown = 0,
@@ -46,9 +47,9 @@ type FileStat = {
 };
 
 type RemoteFileSystem = {
-  readFile(uri: string): Promise<Uint8Array>;
-  readDirectory(uri: string): Promise<[string, FileType][]>;
-  stat(uri: string): Promise<FileStat>;
+  readFile(uri: vscodeUri.URI): Promise<Uint8Array>;
+  readDirectory(uri: vscodeUri.URI): Promise<[string, FileType][]>;
+  stat(uri: vscodeUri.URI): Promise<FileStat>;
 };
 
 class MFS implements RemoteFileSystem {
@@ -68,9 +69,10 @@ class MFS implements RemoteFileSystem {
 
   mkdirSync = fs.mkdirSync;
 
-  async readFile(uri: string): Promise<Uint8Array> {
-    const { pathname: path, protocol } = new URL(uri);
-    const scheme = protocol.slice(0, -1);
+  async readFile(uri: vscodeUri.URI): Promise<Uint8Array> {
+    uri = vscodeUri.URI.from(uri);
+    const path = uri.path;
+    const scheme = uri.scheme;
     if (scheme === this.coreScheme) {
       let content = core.coreMap[path];
       if (content === undefined) {
@@ -78,7 +80,7 @@ class MFS implements RemoteFileSystem {
         if (compressedContent === undefined) {
           throw new Error(`file ${uri.toString()} no found`);
         }
-        const blob = new Blob([compressedContent], {
+        const blob = new Blob([compressedContent as any], {
           type: "application/octet-stream",
         });
         const ungzip = new DecompressionStream("gzip");
@@ -93,15 +95,17 @@ class MFS implements RemoteFileSystem {
     return fs.readFileSync(path);
   }
 
-  async readDirectory(uri: string): Promise<[string, FileType][]> {
-    const path = new URL(uri).pathname;
+  async readDirectory(uri: vscodeUri.URI): Promise<[string, FileType][]> {
+    uri = vscodeUri.URI.from(uri);
+    const path = uri.path;
     const dirents = fs.readdirSync(path, { withFileTypes: true });
     return dirents.map((d) => [d.name, toFileType(d)]);
   }
 
-  async stat(uri: string): Promise<FileStat> {
-    const { pathname: path, protocol } = new URL(uri);
-    const scheme = protocol.slice(0, -1);
+  async stat(uri: vscodeUri.URI): Promise<FileStat> {
+    uri = vscodeUri.URI.from(uri);
+    const path = uri.path;
+    const scheme = uri.scheme;
     if (scheme === this.coreScheme) {
       const content = core.coreMap[path];
       if (content === undefined) {

@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "check": "tsc --noEmit",
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write .",
@@ -49,7 +50,8 @@
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5",
     "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.2.0"
+    "vscode-textmate": "^9.2.0",
+    "vscode-uri": "^3.1.0"
   },
   "peerDependencies": {
     "monaco-editor-core": "^0.52.0"
