@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202509032
-        version: 0.1.202509032
+        specifier: ^0.1.202509124
+        version: 0.1.202509124
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202509032
-        version: 0.1.202509032
+        specifier: ^0.1.202509124
+        version: 0.1.202509124
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -285,8 +285,8 @@ packages:
   '@jridgewell/trace-mapping@0.3.25':
     resolution: {integrity: sha512-vNk6aEwybGtawWmy/PzwnGDOjCkLWSD2wqvjGGAgOAwCGWySYXfYoxt00IJkTF+8Lb57DwOb3Aa0o9CApepiYQ==}
 
-  '@jridgewell/trace-mapping@0.3.30':
-    resolution: {integrity: sha512-GQ7Nw5G2lTu/BtHTKfXhKHok2WGetd4XYcVKGx00SjAk8GMwgJM3zr6zORiPGuOE+/vkc90KtTosSSvaCjKb2Q==}
+  '@jridgewell/trace-mapping@0.3.31':
+    resolution: {integrity: sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw==}
 
   '@microsoft/api-extractor-model@7.30.1':
     resolution: {integrity: sha512-CTS2PlASJHxVY8hqHORVb1HdECWOEMcMnM6/kDkPr0RZapAFSIHhg9D4jxuE8g+OWYHtPc10LCpmde5pylTRlA==}
@@ -301,11 +301,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202509032':
-    resolution: {integrity: sha512-XHYt6EiMAj2I3G+PlUCv/MgQsIO4e3n9Y+ISRXE4TnJpBgPUfTU9b9IlSMZPKuxcDUWjq7h/rfWQdlb03x6ieg==}
+  '@moonbit/analyzer@0.1.202509124':
+    resolution: {integrity: sha512-vhMHe1E8eBWTnJyhxuAjvL2Krkm2zmXb8z6xOiUBlFSqOWlRATw8L4XrohcS8fFwyXiSy8jfItAkVvsWoNI7xg==}
 
-  '@moonbit/moonc-worker@0.1.202509032':
-    resolution: {integrity: sha512-PRcIKxvVf2TBPKZoC8G8fWFUESdpuv1LBoykzvMyPyG+nORaQgFzqT2Hi00LKeY8gpEa8qjYDO0BUw8nAOk0gQ==}
+  '@moonbit/moonc-worker@0.1.202509124':
+    resolution: {integrity: sha512-1Ua3aqCINT+fsUo8DPl8mJD8EicJCqfVwlimjHJMhHCCYrVe0aSI4MwvX+8INxdzIxCF7k03PAMevSSOU0a+Tw==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1236,7 +1236,7 @@ snapshots:
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.5
-      '@jridgewell/trace-mapping': 0.3.30
+      '@jridgewell/trace-mapping': 0.3.31
     optional: true
 
   '@jridgewell/resolve-uri@3.1.2':
@@ -1245,7 +1245,7 @@ snapshots:
   '@jridgewell/source-map@0.3.11':
     dependencies:
       '@jridgewell/gen-mapping': 0.3.13
-      '@jridgewell/trace-mapping': 0.3.30
+      '@jridgewell/trace-mapping': 0.3.31
     optional: true
 
   '@jridgewell/sourcemap-codec@1.5.0': {}
@@ -1259,7 +1259,7 @@ snapshots:
       '@jridgewell/sourcemap-codec': 1.5.0
     optional: true
 
-  '@jridgewell/trace-mapping@0.3.30':
+  '@jridgewell/trace-mapping@0.3.31':
     dependencies:
       '@jridgewell/resolve-uri': 3.1.2
       '@jridgewell/sourcemap-codec': 1.5.5
@@ -1300,9 +1300,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202509032': {}
+  '@moonbit/analyzer@0.1.202509124': {}
 
-  '@moonbit/moonc-worker@0.1.202509032': {}
+  '@moonbit/moonc-worker@0.1.202509124': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
