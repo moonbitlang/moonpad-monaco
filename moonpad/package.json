@@ -1,6 +1,6 @@
 {
   "name": "@moonbit/moonpad-monaco",
-  "version": "0.1.202509125",
+  "version": "0.1.202509192",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -43,8 +43,8 @@
     "vite-plugin-dts": "^4.4.0"
   },
   "dependencies": {
-    "@moonbit/analyzer": "^0.1.202509125",
-    "@moonbit/moonc-worker": "^0.1.202509125",
+    "@moonbit/analyzer": "^0.1.202509192",
+    "@moonbit/moonc-worker": "^0.1.202509192",
     "@zenfs/core": "^1.6.17",
     "comlink": "^4.4.2",
     "vscode-jsonrpc": "^8.2.1",
