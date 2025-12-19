@@ -153,6 +153,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       isMain: true,
       enableValueTracing,
       noOpt: false,
+      indirectImportMiFiles: [],
     });
   } else {
     res = await mooncBuildPackage({
@@ -166,6 +167,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
       enableValueTracing,
       errorFormat: "json",
       noOpt: debugMain,
+      indirectImportMiFiles: [],
     });
   }
   const { core, mi, diagnostics } = res;
