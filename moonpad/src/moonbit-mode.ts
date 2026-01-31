@@ -32,10 +32,10 @@ type initParams = {
 };
 
 function initFs(fs: mfs.MFS): void {
-  fs.mkdirSync("/target");
+  fs.mkdirSync("/_build");
   fs.mkdirSync("/src/lib", { recursive: true });
   fs.writeFileSync(
-    "/target/packages.json",
+    "/_build/packages.json",
     `{
   "source_dir": "/",
   "name": "username/hello",
@@ -81,7 +81,7 @@ function initFs(fs: mfs.MFS): void {
       "deps": [],
       "wbtest-deps": [],
       "test-deps": [],
-      "artifact": "/target/wasm-gc/release/check/lib/lib.mi"
+      "artifact": "/_build/wasm-gc/release/check/lib/lib.mi"
     }
   ],
   "deps": [],
