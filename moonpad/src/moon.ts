@@ -179,7 +179,7 @@ async function compile(params: CompileParams): Promise<CompileResult> {
   }
 
   const coreCoreUri = vscodeUri.URI.parse(
-    `moonbit-core:/lib/core/target/js/release/bundle/core.core`,
+    `moonbit-core:/lib/core/_build/js/release/bundle/core.core`,
   );
   const coreCore = await fs.readFile(coreCoreUri);
   const coreFiles = [coreCore, core];
