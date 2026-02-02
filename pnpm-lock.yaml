@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202601213
-        version: 0.1.202601213
+        specifier: ^0.1.202602022
+        version: 0.1.202602022
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202601213
-        version: 0.1.202601213
+        specifier: ^0.1.202602022
+        version: 0.1.202602022
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -301,11 +301,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202601213':
-    resolution: {integrity: sha512-RQet30chix8EGAHbSqgmZNwMGey3ISMICmC90BhH2mcxkL8bRqZ/LGUH2qNOh28ZEKbgnCNwLt2DsXI09A2miw==}
+  '@moonbit/analyzer@0.1.202602022':
+    resolution: {integrity: sha512-LmSyhFBj3aSe0mvam1jcAwVpbEhguw7aqXHiH6HtwBSV5f94h2VUlDr+Vx+sdWn8WMffGtE6qpdUxc01bYrJaQ==}
 
-  '@moonbit/moonc-worker@0.1.202601213':
-    resolution: {integrity: sha512-tScGGD0uvlcEDD7y3gZb+dWHNPuJ/qf54lQDshIce/sepliOfbI7VfbCL/JZGMZgGhMnp+OAO/JsFEs9vi6ZIQ==}
+  '@moonbit/moonc-worker@0.1.202602022':
+    resolution: {integrity: sha512-uZxb8Vl8V3aOEr6QkRrFMTKS7mq0Ld9JZihcou9/D0CTZRdb0OtIyD6Obq3hAI3C0MsC1jz24a+tVAv44ngZIQ==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1300,9 +1300,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202601213': {}
+  '@moonbit/analyzer@0.1.202602022': {}
 
-  '@moonbit/moonc-worker@0.1.202601213': {}
+  '@moonbit/moonc-worker@0.1.202602022': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
