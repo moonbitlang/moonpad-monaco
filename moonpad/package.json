@@ -1,6 +1,6 @@
 {
   "name": "@moonbit/moonpad-monaco",
-  "version": "0.1.202602022",
+  "version": "0.1.202602023",
   "type": "module",
   "scripts": {
     "dev": "vite",
