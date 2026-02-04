@@ -67,6 +67,8 @@ class MFS implements RemoteFileSystem {
 
   writeFileSync = fs.writeFileSync;
 
+  existsSync = fs.existsSync;
+
   mkdirSync = fs.mkdirSync;
 
   async readFile(uri: vscodeUri.URI): Promise<Uint8Array> {

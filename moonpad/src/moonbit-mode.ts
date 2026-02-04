@@ -31,9 +31,15 @@ type initParams = {
   codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
 
+function ensureDirSync(fs: mfs.MFS, path: string) {
+  if (!fs.existsSync(path)) {
+    fs.mkdirSync(path, { recursive: true });
+  }
+}
+
 function initFs(fs: mfs.MFS): void {
-  fs.mkdirSync("/_build");
-  fs.mkdirSync("/src/lib", { recursive: true });
+  ensureDirSync(fs, "/_build");
+  ensureDirSync(fs, "/src/lib");
   fs.writeFileSync(
     "/_build/packages.json",
     `{
