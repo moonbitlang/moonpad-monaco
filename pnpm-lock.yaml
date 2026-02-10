@@ -33,11 +33,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202602022
-        version: 0.1.202602022
+        specifier: ^0.1.202602102
+        version: 0.1.202602102
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202602022
-        version: 0.1.202602022
+        specifier: ^0.1.202602102
+        version: 0.1.202602102
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -301,11 +301,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202602022':
-    resolution: {integrity: sha512-LmSyhFBj3aSe0mvam1jcAwVpbEhguw7aqXHiH6HtwBSV5f94h2VUlDr+Vx+sdWn8WMffGtE6qpdUxc01bYrJaQ==}
+  '@moonbit/analyzer@0.1.202602102':
+    resolution: {integrity: sha512-rungXb9OFW8LoTeAa842DWeR/ZHqkULvvax/Astj5IsrjkJPB92tfQLsJmwtr+7fRcRBeK2Xp0eN+Obi7vA4Dg==}
 
-  '@moonbit/moonc-worker@0.1.202602022':
-    resolution: {integrity: sha512-uZxb8Vl8V3aOEr6QkRrFMTKS7mq0Ld9JZihcou9/D0CTZRdb0OtIyD6Obq3hAI3C0MsC1jz24a+tVAv44ngZIQ==}
+  '@moonbit/moonc-worker@0.1.202602102':
+    resolution: {integrity: sha512-IBQGEJBkvGQDewkg6cc6n952tUM8RwR7N/+avH2l9uIUtjBpWgTLE2bqtRHkvg2at88cHa6+r5NSLZ3GCCmKhQ==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -685,6 +685,7 @@ packages:
 
   glob@10.4.5:
     resolution: {integrity: sha512-7Bv8RF0k6xjo7d4A/PxYLbUCfb6c+Vpd2/mB2yRDlew7Jb5hEXiCD9ibfO7wpk8i4sevK6DFny9h7EYbM3/sHg==}
+    deprecated: Old versions of glob are not supported, and contain widely publicized security vulnerabilities, which have been fixed in the current version. Please update. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me
     hasBin: true
 
   graceful-fs@4.2.11:
@@ -1300,9 +1301,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202602022': {}
+  '@moonbit/analyzer@0.1.202602102': {}
 
-  '@moonbit/moonc-worker@0.1.202602022': {}
+  '@moonbit/moonc-worker@0.1.202602102': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
