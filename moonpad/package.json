@@ -7,6 +7,7 @@
     "check": "tsc --noEmit",
     "build": "tsc && vite build",
     "preview": "vite preview",
+    "trace:mvp": "node ./scripts/trace-mvp.mjs demo",
     "format": "prettier --write .",
     "prepublish": "tsc && vite build"
   },
