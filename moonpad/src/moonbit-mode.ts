@@ -1042,11 +1042,14 @@ function traceCommandFactory() {
         if (runningAborters.get(modelId) !== aborter) return;
         runningAborters.delete(modelId);
         const { traceResults, stdout } = parsed;
+        const filteredTraceResults = traceResults.filter((res) =>
+          traceResultMatchesModel(res, muri.path, name),
+        );
         const oldDecorations = decorations.get(model.id) ?? [];
         const newDecorations = renderTraceResults(
           model,
           oldDecorations,
-          traceResults,
+          filteredTraceResults,
         );
         decorations.set(model.id, newDecorations);
         let d = model.onDidChangeContent(() => {
@@ -1056,6 +1059,7 @@ function traceCommandFactory() {
         console.log("[moonpad-trace] run complete", {
           uri,
           traceResultCount: traceResults.length,
+          renderedTraceCount: filteredTraceResults.length,
           stdoutChars: stdout.length,
         });
         return stdout;
@@ -1070,6 +1074,7 @@ type TraceResult = {
   line: number;
   start_column: number;
   end_column: number;
+  filepath?: string;
   hit: number;
 };
 
@@ -1080,13 +1085,17 @@ const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
 const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
 
 function traceKey(
-  trace: Pick<TraceResult, "name" | "line" | "start_column" | "end_column">,
+  trace: Pick<
+    TraceResult,
+    "name" | "line" | "start_column" | "end_column" | "filepath"
+  >,
 ): string {
   return JSON.stringify({
     name: trace.name,
     line: trace.line,
     start_column: trace.start_column,
     end_column: trace.end_column,
+    filepath: trace.filepath ?? "",
   });
 }
 
@@ -1229,20 +1238,49 @@ function isAbortError(error: unknown): boolean {
   );
 }
 
+function traceResultMatchesModel(
+  res: TraceResult,
+  modelPath: string,
+  modelName: string,
+): boolean {
+  const filepath = res.filepath;
+  if (!filepath) return true;
+  return (
+    filepath === modelPath ||
+    filepath === modelName ||
+    filepath.endsWith(`/${modelName}`) ||
+    filepath.endsWith(`\\${modelName}`)
+  );
+}
+
+function formatTraceValue(value: string): string {
+  const oneLine = value.split("\n").join("\\n");
+  const maxLen = 160;
+  if (oneLine.length <= maxLen) return oneLine;
+  return `${oneLine.slice(0, maxLen)}...`;
+}
+
 function renderTraceResults(
   model: monaco.editor.ITextModel,
   oldDecorations: string[],
   results: TraceResult[],
 ): string[] {
   const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+  const lineCount = model.getLineCount();
   for (const res of results) {
     const line = res.line;
-    const character = model.getLineLastNonWhitespaceColumn(line);
+    if (line < 1 || line > lineCount) continue;
+    const nonWhitespace = model.getLineLastNonWhitespaceColumn(line);
+    const character =
+      nonWhitespace > 0 ? nonWhitespace : model.getLineMaxColumn(line);
+    const content = `${res.name} = ${formatTraceValue(res.value)}${
+      res.hit > 1 ? ` (${res.hit} hits)` : ""
+    }`;
     newDecorations.push({
-      range: new monaco.Range(line, character - 1, line, character),
+      range: new monaco.Range(line, character, line, character),
       options: {
         after: {
-          content: `${res.name} = ${res.value}${res.hit > 1 ? ` (${res.hit} hits)` : ""}`,
+          content,
           inlineClassName: "moonbit-trace",
           cursorStops: monaco.editor.InjectedTextCursorStops.None,
         },
