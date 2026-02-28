@@ -31,6 +31,18 @@ type initParams = {
   codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
 
+type TraceModelState = {
+  decorations: string[];
+  aborter?: AbortController;
+  runToken: number;
+  clearOnEdit?: monaco.IDisposable;
+};
+
+const sharedTraceStates = new Map<string, TraceModelState>();
+let sharedTraceCommand:
+  | ((uri: string) => Promise<string | undefined>)
+  | undefined = undefined;
+
 function ensureDirSync(fs: mfs.MFS, path: string) {
   if (!fs.existsSync(path)) {
     fs.mkdirSync(path, { recursive: true });
@@ -1031,25 +1043,45 @@ function runMainCommandFactory() {
 }
 
 function traceCommandFactory() {
-  const decorations = new Map<string, string[]>();
-  const runningAborters = new Map<string, AbortController>();
-  return async (uri: string): Promise<string | undefined> => {
+  if (sharedTraceCommand) return sharedTraceCommand;
+  sharedTraceCommand = async (uri: string): Promise<string | undefined> => {
     const muri = monaco.Uri.parse(uri);
     const model = monaco.editor.getModel(muri);
     if (model === null) return;
     const modelId = model.id;
-    runningAborters.get(modelId)?.abort();
+    const state = sharedTraceStates.get(modelId) ?? {
+      decorations: [],
+      runToken: 0,
+    };
+    sharedTraceStates.set(modelId, state);
+    state.clearOnEdit?.dispose();
+    state.clearOnEdit = undefined;
+    if (state.decorations.length > 0) {
+      state.decorations = model.deltaDecorations(state.decorations, []);
+    }
+    state.aborter?.abort();
     const aborter = new AbortController();
-    runningAborters.set(modelId, aborter);
+    state.aborter = aborter;
+    const runToken = state.runToken + 1;
+    state.runToken = runToken;
+    const isCurrentRun = () => {
+      const current = sharedTraceStates.get(modelId);
+      return (
+        current !== undefined &&
+        current.runToken === runToken &&
+        current.aborter === aborter
+      );
+    };
     const name = muri.path.split("/").at(-1)!;
     const result = await moon.compile({
       libInputs: [[name, model.getValue()]],
       enableValueTracing: true,
     });
+    if (!isCurrentRun()) return;
     switch (result.kind) {
       case "error": {
-        if (runningAborters.get(modelId) === aborter) {
-          runningAborters.delete(modelId);
+        if (isCurrentRun()) {
+          state.aborter = undefined;
         }
         console.error(result.diagnostics);
         return;
@@ -1057,9 +1089,8 @@ function traceCommandFactory() {
       case "success": {
         const js = result.js;
         const stdoutStream = moon.run(js, { blockingCredits: 64 });
-        let liveDecorations = decorations.get(model.id) ?? [];
         const applyTraceResults = (traceResults: TraceResult[]) => {
-          if (runningAborters.get(modelId) !== aborter) return;
+          if (!isCurrentRun()) return;
           const filteredTraceResults = traceResults.filter((res) =>
             traceResultMatchesModel(res, muri.path, name),
           );
@@ -1067,31 +1098,38 @@ function traceCommandFactory() {
             filteredTraceResults.length > 0 || traceResults.length === 0
               ? filteredTraceResults
               : traceResults;
-          liveDecorations = renderTraceResults(
-            model,
-            liveDecorations,
+          const normalizedTraceResults = dedupeTraceResultsForRender(
             traceResultsToRender,
           );
-          decorations.set(model.id, liveDecorations);
+          state.decorations = renderTraceResults(
+            model,
+            state.decorations,
+            normalizedTraceResults,
+          );
         };
         const parsed = await parseTraceOutput(
           stdoutStream,
           aborter.signal,
           applyTraceResults,
         );
-        if (!parsed) return;
-        if (runningAborters.get(modelId) !== aborter) return;
-        runningAborters.delete(modelId);
+        if (!parsed) {
+          if (isCurrentRun()) state.aborter = undefined;
+          return;
+        }
+        if (!isCurrentRun()) return;
+        state.aborter = undefined;
         const { traceResults, stdout } = parsed;
         applyTraceResults(traceResults);
-        let d = model.onDidChangeContent(() => {
-          decorations.set(model.id, model.deltaDecorations(liveDecorations, []));
-          d.dispose();
+        state.clearOnEdit = model.onDidChangeContent(() => {
+          state.decorations = model.deltaDecorations(state.decorations, []);
+          state.clearOnEdit?.dispose();
+          state.clearOnEdit = undefined;
         });
         return stdout;
       }
     }
   };
+  return sharedTraceCommand;
 }
 
 type TraceResult = {
@@ -1298,6 +1336,30 @@ function formatTraceValue(value: string): string {
   const maxLen = 160;
   if (oneLine.length <= maxLen) return oneLine;
   return `${oneLine.slice(0, maxLen)}...`;
+}
+
+function dedupeTraceResultsForRender(results: TraceResult[]): TraceResult[] {
+  const deduped = new Map<string, TraceResult>();
+  for (const res of results) {
+    const key = JSON.stringify({
+      name: res.name,
+      line: res.line,
+      start_column: res.start_column,
+      end_column: res.end_column,
+    });
+    const prev = deduped.get(key);
+    if (!prev) {
+      deduped.set(key, { ...res });
+      continue;
+    }
+    deduped.set(key, {
+      ...prev,
+      value: res.value || prev.value,
+      hit: prev.hit + res.hit,
+      filepath: prev.filepath ?? res.filepath,
+    });
+  }
+  return [...deduped.values()];
 }
 
 function renderTraceResults(
