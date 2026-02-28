@@ -1039,16 +1039,23 @@ function traceCommandFactory() {
         const stdoutStream = moon.run(js, { blockingCredits: 64 });
         let liveDecorations = decorations.get(model.id) ?? [];
         let renderedTraceCount = 0;
+        let fallbackRenderUsed = false;
         const applyTraceResults = (traceResults: TraceResult[]) => {
           if (runningAborters.get(modelId) !== aborter) return;
           const filteredTraceResults = traceResults.filter((res) =>
             traceResultMatchesModel(res, muri.path, name),
           );
-          renderedTraceCount = filteredTraceResults.length;
+          const traceResultsToRender =
+            filteredTraceResults.length > 0 || traceResults.length === 0
+              ? filteredTraceResults
+              : traceResults;
+          fallbackRenderUsed =
+            filteredTraceResults.length === 0 && traceResults.length > 0;
+          renderedTraceCount = traceResultsToRender.length;
           liveDecorations = renderTraceResults(
             model,
             liveDecorations,
-            filteredTraceResults,
+            traceResultsToRender,
           );
           decorations.set(model.id, liveDecorations);
         };
@@ -1070,6 +1077,7 @@ function traceCommandFactory() {
           uri,
           traceResultCount: traceResults.length,
           renderedTraceCount,
+          fallbackRenderUsed,
           stdoutChars: stdout.length,
         });
         return stdout;
@@ -1294,14 +1302,18 @@ function renderTraceResults(
   for (const res of results) {
     const line = res.line;
     if (line < 1 || line > lineCount) continue;
+    const maxColumn = model.getLineMaxColumn(line);
     const nonWhitespace = model.getLineLastNonWhitespaceColumn(line);
-    const character =
-      nonWhitespace > 0 ? nonWhitespace : model.getLineMaxColumn(line);
+    const character = nonWhitespace > 0 ? nonWhitespace : 1;
+    const rangeStart = Math.min(maxColumn - 1, character);
+    const startColumn = Math.max(1, rangeStart);
+    const endColumn = Math.min(maxColumn, startColumn + 1);
+    if (endColumn <= startColumn) continue;
     const content = `${res.name} = ${formatTraceValue(res.value)}${
       res.hit > 1 ? ` (${res.hit} hits)` : ""
     }`;
     newDecorations.push({
-      range: new monaco.Range(line, character, line, character),
+      range: new monaco.Range(line, startColumn, line, endColumn),
       options: {
         after: {
           content,
