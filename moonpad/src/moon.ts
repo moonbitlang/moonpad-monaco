@@ -256,6 +256,26 @@ type RunOptions = {
   signal?: AbortSignal;
 };
 
+type TraceResult = {
+  name: string;
+  value: string;
+  line: number;
+  start_column: number;
+  end_column: number;
+  filepath?: string;
+  hit: number;
+};
+
+type TraceRunOutput =
+  | {
+      kind: "trace-delta";
+      entries: TraceResult[];
+    }
+  | {
+      kind: "stdout-batch";
+      lines: string[];
+    };
+
 function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   let isInSection = false;
   let stdout = "";
@@ -390,6 +410,122 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
   });
 }
 
+function runTrace(
+  js: Uint8Array,
+  options: RunOptions = {},
+): ReadableStream<TraceRunOutput> {
+  const worker = new moonrunWorker();
+  const requestedCredits = options.blockingCredits ?? 0;
+  const creditsEnabled = requestedCredits > 0;
+  const initialCredits = creditsEnabled ? Math.max(1, requestedCredits) : 0;
+  const creditState =
+    initialCredits > 0 && typeof SharedArrayBuffer !== "undefined"
+      ? new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
+      : undefined;
+  let warnedMissingSharedBuffer = false;
+  const releaseCredit = () => {
+    if (!creditState) {
+      if (creditsEnabled && !warnedMissingSharedBuffer) {
+        warnedMissingSharedBuffer = true;
+        console.warn(
+          "[moonpad-run] SharedArrayBuffer unavailable; blocking backpressure disabled",
+        );
+      }
+      return;
+    }
+    Atomics.add(creditState, 0, 1);
+    Atomics.notify(creditState, 0, 1);
+  };
+  const pending: TraceRunOutput[] = [];
+  let isDone = false;
+  let pendingError: Error | undefined = undefined;
+  let isClosed = false;
+  let controllerRef:
+    | ReadableStreamDefaultController<TraceRunOutput>
+    | undefined;
+  let detachAbortListener: (() => void) | undefined = undefined;
+  const closeWorker = () => {
+    if (isClosed) return;
+    isClosed = true;
+    detachAbortListener?.();
+    detachAbortListener = undefined;
+    worker.terminate();
+  };
+  const flush = () => {
+    const controller = controllerRef;
+    if (!controller || isClosed) return;
+    if (pendingError) {
+      closeWorker();
+      controller.error(pendingError);
+      return;
+    }
+    while (pending.length > 0 && (controller.desiredSize ?? 0) > 0) {
+      const chunk = pending.shift()!;
+      controller.enqueue(chunk);
+      releaseCredit();
+    }
+    if (isDone && pending.length === 0) {
+      closeWorker();
+      controller.close();
+    }
+  };
+  worker.onmessage = (e: MessageEvent<TraceRunOutput | null | Error>) => {
+    if (isClosed) return;
+    if (e.data instanceof Error) {
+      pendingError = e.data;
+      flush();
+      return;
+    }
+    if (e.data === null) {
+      isDone = true;
+      flush();
+      return;
+    }
+    pending.push(e.data);
+    flush();
+  };
+  return new ReadableStream<TraceRunOutput>({
+    start(controller) {
+      controllerRef = controller;
+      if (options.signal) {
+        if (options.signal.aborted) {
+          closeWorker();
+          controller.close();
+          return;
+        }
+        const abortHandler = () => {
+          closeWorker();
+          controller.close();
+        };
+        options.signal.addEventListener("abort", abortHandler, { once: true });
+        detachAbortListener = () => {
+          options.signal?.removeEventListener("abort", abortHandler);
+        };
+      }
+      if (creditState) {
+        Atomics.store(creditState, 0, initialCredits);
+        worker.postMessage({
+          js,
+          creditState: creditState.buffer as SharedArrayBuffer,
+          traceAggregate: true,
+        });
+      } else {
+        worker.postMessage({
+          js,
+          traceAggregate: true,
+        });
+      }
+      flush();
+    },
+    pull() {
+      flush();
+    },
+    cancel() {
+      closeWorker();
+    },
+  });
+}
+
 function test(js: Uint8Array): ReadableStream<TestOutput> {
   return run(js).pipeThrough(parseTestOutputTransformStream());
 }
@@ -399,4 +535,5 @@ function init(factory: () => Worker) {
   mooncWorkerFactory = factory;
 }
 
-export { compile, init, run, test };
+export { compile, init, run, runTrace, test };
+export type { TraceResult, TraceRunOutput };

@@ -1088,19 +1088,18 @@ function traceCommandFactory() {
       }
       case "success": {
         const js = result.js;
-        const stdoutStream = moon.run(js, {
-          blockingCredits: 64,
-          signal: aborter.signal,
-        });
-        const applyTraceResults = (traceResults: TraceResult[]) => {
+        const traceResults = new Map<string, TraceResult>();
+        const stdoutLines: string[] = [];
+        const applyTraceResults = () => {
           if (!isCurrentRun()) return;
-          const filteredTraceResults = traceResults.filter((res) =>
+          const currentTraceResults = [...traceResults.values()];
+          const filteredTraceResults = currentTraceResults.filter((res) =>
             traceResultMatchesModel(res, muri.path, name),
           );
           const traceResultsToRender =
-            filteredTraceResults.length > 0 || traceResults.length === 0
+            filteredTraceResults.length > 0 || currentTraceResults.length === 0
               ? filteredTraceResults
-              : traceResults;
+              : currentTraceResults;
           const normalizedTraceResults = dedupeTraceResultsForRender(
             traceResultsToRender,
           );
@@ -1110,25 +1109,43 @@ function traceCommandFactory() {
             normalizedTraceResults,
           );
         };
-        const parsed = await parseTraceOutput(
-          stdoutStream,
-          aborter.signal,
-          applyTraceResults,
-        );
-        if (!parsed) {
-          if (isCurrentRun()) state.aborter = undefined;
-          return;
+        try {
+          await moon
+            .runTrace(js, {
+              blockingCredits: 64,
+              signal: aborter.signal,
+            })
+            .pipeTo(
+              new WritableStream<moon.TraceRunOutput>({
+                write(chunk) {
+                  if (chunk.kind === "stdout-batch") {
+                    stdoutLines.push(...chunk.lines);
+                    return;
+                  }
+                  for (const entry of chunk.entries) {
+                    traceResults.set(traceKey(entry), entry);
+                  }
+                  applyTraceResults();
+                },
+              }),
+              { signal: aborter.signal },
+            );
+        } catch (error) {
+          if (isAbortError(error)) {
+            if (isCurrentRun()) state.aborter = undefined;
+            return;
+          }
+          throw error;
         }
         if (!isCurrentRun()) return;
         state.aborter = undefined;
-        const { traceResults, stdout } = parsed;
-        applyTraceResults(traceResults);
+        applyTraceResults();
         state.clearOnEdit = model.onDidChangeContent(() => {
           state.decorations = model.deltaDecorations(state.decorations, []);
           state.clearOnEdit?.dispose();
           state.clearOnEdit = undefined;
         });
-        return stdout;
+        return stdoutLines.join("\n");
       }
     }
   };
@@ -1145,12 +1162,6 @@ type TraceResult = {
   hit: number;
 };
 
-const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
-const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
-
-const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
-const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
-
 function traceKey(
   trace: Pick<
     TraceResult,
@@ -1164,150 +1175,6 @@ function traceKey(
     end_column: trace.end_column,
     filepath: trace.filepath ?? "",
   });
-}
-
-type TraceParseState = {
-  section: TraceParseSection;
-  lastResultKey: string | undefined;
-  pendingValueLines: string[];
-  pendingChunkLine: string;
-  results: Map<string, TraceResult>;
-  stdoutLines: string[];
-};
-
-enum TraceParseSection {
-  Stdout,
-  TraceMeta,
-  TraceValue,
-}
-
-function createTraceParseState(): TraceParseState {
-  return {
-    section: TraceParseSection.Stdout,
-    lastResultKey: undefined,
-    pendingValueLines: [],
-    pendingChunkLine: "",
-    results: new Map(),
-    stdoutLines: [],
-  };
-}
-
-function commitPendingTraceValue(state: TraceParseState) {
-  if (!state.lastResultKey) return;
-  const res = state.results.get(state.lastResultKey);
-  if (!res) return;
-  res.value = state.pendingValueLines.join("\n");
-}
-
-function feedTraceLine(state: TraceParseState, line: string): boolean {
-  if (line === TRACING_START) {
-    state.section = TraceParseSection.TraceMeta;
-    return false;
-  } else if (line === TRACING_END) {
-    state.section = TraceParseSection.Stdout;
-    state.pendingValueLines = [];
-    state.lastResultKey = undefined;
-    return false;
-  } else if (line === TRACING_CONTENT_START) {
-    state.section = TraceParseSection.TraceValue;
-    state.pendingValueLines = [];
-    return false;
-  } else if (line === TRACING_CONTENT_END) {
-    commitPendingTraceValue(state);
-    state.section = TraceParseSection.TraceMeta;
-    state.pendingValueLines = [];
-    return true;
-  }
-
-  switch (state.section) {
-    case TraceParseSection.TraceValue: {
-      state.pendingValueLines.push(line);
-      return false;
-    }
-    case TraceParseSection.TraceMeta: {
-      const j = JSON.parse(line) as Omit<TraceResult, "value" | "hit">;
-      const key = traceKey(j);
-      state.lastResultKey = key;
-      const res = state.results.get(key);
-      if (res === undefined) {
-        state.results.set(key, {
-          ...j,
-          value: "",
-          hit: 1,
-        });
-      } else {
-        state.results.set(key, {
-          ...j,
-          value: res.value,
-          hit: res.hit + 1,
-        });
-      }
-      return false;
-    }
-    case TraceParseSection.Stdout:
-      state.stdoutLines.push(line);
-      return false;
-  }
-}
-
-function feedTraceChunk(state: TraceParseState, chunk: string): boolean {
-  let hasCommittedValue = false;
-  if (!chunk.includes("\n") && !chunk.includes("\r") && state.pendingChunkLine === "") {
-    return feedTraceLine(state, chunk);
-  }
-  const text = state.pendingChunkLine + chunk;
-  const lines = text.split(/\r?\n/);
-  state.pendingChunkLine = lines.pop() ?? "";
-  for (const line of lines) {
-    if (feedTraceLine(state, line)) hasCommittedValue = true;
-  }
-  return hasCommittedValue;
-}
-
-async function parseTraceOutput(
-  stream: ReadableStream<string>,
-  signal: AbortSignal,
-  onProgress?: (traceResults: TraceResult[]) => void,
-): Promise<
-  | {
-      traceResults: TraceResult[];
-      stdout: string;
-    }
-  | undefined
-> {
-  const state = createTraceParseState();
-  const PROGRESS_INTERVAL_MS = 100;
-  let lastProgressMs = 0;
-  const emitProgress = (force = false) => {
-    if (!onProgress) return;
-    const now = performance.now();
-    if (!force && now - lastProgressMs < PROGRESS_INTERVAL_MS) return;
-    lastProgressMs = now;
-    onProgress([...state.results.values()]);
-  };
-  try {
-    await stream.pipeTo(
-      new WritableStream({
-        write(chunk) {
-          if (feedTraceChunk(state, chunk)) emitProgress();
-        },
-      }),
-      { signal },
-    );
-  } catch (error) {
-    if (isAbortError(error)) return;
-    throw error;
-  }
-  if (state.pendingChunkLine.length > 0) {
-    if (feedTraceLine(state, state.pendingChunkLine)) {
-      emitProgress();
-    }
-  }
-  emitProgress(true);
-  return {
-    traceResults: [...state.results.values()],
-    stdout: state.stdoutLines.join("\n"),
-  };
 }
 
 function isAbortError(error: unknown): boolean {
