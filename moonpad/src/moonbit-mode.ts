@@ -982,6 +982,7 @@ function init(params: initParams): typeof moon {
     codeLensProvider,
   );
   moon.init(mooncWorkerFactory);
+  const runMain = runMainCommandFactory();
   const traceMain = traceCommandFactory();
   monaco.editor.registerCommand("moonbit-lsp/trace-main", async (_, param) => {
     const fileUri =
@@ -995,32 +996,52 @@ function init(params: initParams): typeof moon {
       (param as { fileUri?: string; uri?: string } | undefined)?.fileUri ??
       (param as { fileUri?: string; uri?: string } | undefined)?.uri;
     if (!fileUri) return;
-    traceMain(fileUri);
+    runMain(fileUri);
   });
   return moon;
+}
+
+function runMainCommandFactory() {
+  return async (uri: string): Promise<string | undefined> => {
+    const muri = monaco.Uri.parse(uri);
+    const model = monaco.editor.getModel(muri);
+    if (model === null) return;
+    const name = muri.path.split("/").at(-1)!;
+    const result = await moon.compile({
+      libInputs: [[name, model.getValue()]],
+    });
+    switch (result.kind) {
+      case "error": {
+        console.error(result.diagnostics);
+        return;
+      }
+      case "success": {
+        const stdoutParts: string[] = [];
+        await moon.run(result.js).pipeTo(
+          new WritableStream({
+            write(chunk) {
+              stdoutParts.push(chunk);
+            },
+          }),
+        );
+        return stdoutParts.join("\n");
+      }
+    }
+  };
 }
 
 function traceCommandFactory() {
   const decorations = new Map<string, string[]>();
   const runningAborters = new Map<string, AbortController>();
-  console.log("[moonpad-trace] command ready");
   return async (uri: string): Promise<string | undefined> => {
-    console.log("[moonpad-trace] run start", { uri });
     const muri = monaco.Uri.parse(uri);
     const model = monaco.editor.getModel(muri);
-    if (model === null) {
-      console.log("[moonpad-trace] run skipped (model not found)", { uri });
-      return;
-    }
+    if (model === null) return;
     const modelId = model.id;
     runningAborters.get(modelId)?.abort();
     const aborter = new AbortController();
     runningAborters.set(modelId, aborter);
     const name = muri.path.split("/").at(-1)!;
-    console.log("[moonpad-trace] compile", {
-      file: name,
-      enableValueTracing: true,
-    });
     const result = await moon.compile({
       libInputs: [[name, model.getValue()]],
       enableValueTracing: true,
@@ -1030,7 +1051,6 @@ function traceCommandFactory() {
         if (runningAborters.get(modelId) === aborter) {
           runningAborters.delete(modelId);
         }
-        console.log("[moonpad-trace] compile error", { uri });
         console.error(result.diagnostics);
         return;
       }
@@ -1038,8 +1058,6 @@ function traceCommandFactory() {
         const js = result.js;
         const stdoutStream = moon.run(js, { blockingCredits: 64 });
         let liveDecorations = decorations.get(model.id) ?? [];
-        let renderedTraceCount = 0;
-        let fallbackRenderUsed = false;
         const applyTraceResults = (traceResults: TraceResult[]) => {
           if (runningAborters.get(modelId) !== aborter) return;
           const filteredTraceResults = traceResults.filter((res) =>
@@ -1049,9 +1067,6 @@ function traceCommandFactory() {
             filteredTraceResults.length > 0 || traceResults.length === 0
               ? filteredTraceResults
               : traceResults;
-          fallbackRenderUsed =
-            filteredTraceResults.length === 0 && traceResults.length > 0;
-          renderedTraceCount = traceResultsToRender.length;
           liveDecorations = renderTraceResults(
             model,
             liveDecorations,
@@ -1072,13 +1087,6 @@ function traceCommandFactory() {
         let d = model.onDidChangeContent(() => {
           decorations.set(model.id, model.deltaDecorations(liveDecorations, []));
           d.dispose();
-        });
-        console.log("[moonpad-trace] run complete", {
-          uri,
-          traceResultCount: traceResults.length,
-          renderedTraceCount,
-          fallbackRenderUsed,
-          stdoutChars: stdout.length,
         });
         return stdout;
       }
