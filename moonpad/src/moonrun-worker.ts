@@ -47,6 +47,8 @@ const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
 const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
 const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
 const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
+const TRACE_FLUSH_INTERVAL_MS = 16;
+const TRACE_FLUSH_EVERY_COMMITS = 32;
 
 self.onmessage = async (e: MessageEvent<RunRequest>) => {
   const data = e.data;
@@ -124,6 +126,7 @@ type WorkerTraceParseState = {
   pendingDeltas: Map<string, TraceResult>;
   pendingStdout: string[];
   flushTimer: number | undefined;
+  commitsSinceFlush: number;
 };
 
 async function runJsAggregate(js: Uint8Array, creditState?: SharedArrayBuffer) {
@@ -147,6 +150,7 @@ async function runJsAggregate(js: Uint8Array, creditState?: SharedArrayBuffer) {
     pendingDeltas: new Map(),
     pendingStdout: [],
     flushTimer: undefined,
+    commitsSinceFlush: 0,
   };
   const post = (message: TraceWorkerMessage) => {
     waitForCredit(credit);
@@ -171,12 +175,13 @@ async function runJsAggregate(js: Uint8Array, creditState?: SharedArrayBuffer) {
       });
       state.pendingStdout = [];
     }
+    state.commitsSinceFlush = 0;
   };
   const scheduleFlush = () => {
     if (state.flushTimer !== undefined) return;
     state.flushTimer = setTimeout(() => {
       flushNow();
-    }, 100) as unknown as number;
+    }, TRACE_FLUSH_INTERVAL_MS) as unknown as number;
   };
   const commitTraceValue = () => {
     if (!state.lastResultKey) return;
@@ -184,6 +189,11 @@ async function runJsAggregate(js: Uint8Array, creditState?: SharedArrayBuffer) {
     if (!res) return;
     res.value = state.pendingValueLines.join("\n");
     state.pendingDeltas.set(state.lastResultKey, { ...res });
+    state.commitsSinceFlush += 1;
+    if (state.commitsSinceFlush >= TRACE_FLUSH_EVERY_COMMITS) {
+      flushNow();
+      return;
+    }
     scheduleFlush();
   };
   const feedTraceLine = (line: string) => {
