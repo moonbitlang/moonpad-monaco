@@ -294,6 +294,9 @@ function run(js: Uint8Array): ReadableStream<string> {
         }
       };
     },
+    cancel() {
+      worker.terminate();
+    },
   });
 }
 
