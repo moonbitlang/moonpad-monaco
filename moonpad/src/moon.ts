@@ -253,6 +253,7 @@ type TestResult = {
 type RunOptions = {
   // Enable worker-side blocking backpressure when SharedArrayBuffer is available.
   blockingCredits?: number;
+  signal?: AbortSignal;
 };
 
 function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
@@ -310,9 +311,12 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
   let pendingError: Error | undefined = undefined;
   let isClosed = false;
   let controllerRef: ReadableStreamDefaultController<string> | undefined;
+  let detachAbortListener: (() => void) | undefined = undefined;
   const closeWorker = () => {
     if (isClosed) return;
     isClosed = true;
+    detachAbortListener?.();
+    detachAbortListener = undefined;
     worker.terminate();
   };
   const flush = () => {
@@ -351,6 +355,21 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
   return new ReadableStream<string>({
     start(controller) {
       controllerRef = controller;
+      if (options.signal) {
+        if (options.signal.aborted) {
+          closeWorker();
+          controller.close();
+          return;
+        }
+        const abortHandler = () => {
+          closeWorker();
+          controller.close();
+        };
+        options.signal.addEventListener("abort", abortHandler, { once: true });
+        detachAbortListener = () => {
+          options.signal?.removeEventListener("abort", abortHandler);
+        };
+      }
       if (creditState) {
         Atomics.store(creditState, 0, initialCredits);
         worker.postMessage({

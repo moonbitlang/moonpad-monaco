@@ -1088,7 +1088,10 @@ function traceCommandFactory() {
       }
       case "success": {
         const js = result.js;
-        const stdoutStream = moon.run(js, { blockingCredits: 64 });
+        const stdoutStream = moon.run(js, {
+          blockingCredits: 64,
+          signal: aborter.signal,
+        });
         const applyTraceResults = (traceResults: TraceResult[]) => {
           if (!isCurrentRun()) return;
           const filteredTraceResults = traceResults.filter((res) =>
