@@ -1007,8 +1007,8 @@ function traceCommandFactory() {
       case "success": {
         const js = result.js;
         const stdoutStream = moon.run(js);
-        const lines = await collect(stdoutStream);
-        const { traceResults, stdout } = parseTraceOutput(lines);
+        const parsed = await parseTraceOutput(stdoutStream);
+        const { traceResults, stdout } = parsed;
         const oldDecorations = decorations.get(model.id) ?? [];
         const newDecorations = renderTraceResults(
           model,
@@ -1041,19 +1041,9 @@ const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
 const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
 const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
 
-async function collect(s: ReadableStream<string>): Promise<string[]> {
-  const lines: string[] = [];
-  await s.pipeTo(
-    new WritableStream({
-      write(chunk) {
-        lines.push(chunk);
-      },
-    }),
-  );
-  return lines;
-}
-
-function traceKey(trace: TraceResult): string {
+function traceKey(
+  trace: Pick<TraceResult, "name" | "line" | "start_column" | "end_column">,
+): string {
   return JSON.stringify({
     name: trace.name,
     line: trace.line,
@@ -1062,52 +1052,105 @@ function traceKey(trace: TraceResult): string {
   });
 }
 
-function parseTraceOutput(lines: string[]): {
+type TraceParseState = {
+  section: TraceParseSection;
+  lastResultKey: string | undefined;
+  pendingValueLines: string[];
+  results: Map<string, TraceResult>;
+  stdoutLines: string[];
+};
+
+enum TraceParseSection {
+  Stdout,
+  TraceMeta,
+  TraceValue,
+}
+
+function createTraceParseState(): TraceParseState {
+  return {
+    section: TraceParseSection.Stdout,
+    lastResultKey: undefined,
+    pendingValueLines: [],
+    results: new Map(),
+    stdoutLines: [],
+  };
+}
+
+function commitPendingTraceValue(state: TraceParseState) {
+  if (!state.lastResultKey) return;
+  const res = state.results.get(state.lastResultKey);
+  if (!res) return;
+  res.value = state.pendingValueLines.join("\n");
+}
+
+function feedTraceLine(state: TraceParseState, line: string) {
+  if (line === TRACING_START) {
+    state.section = TraceParseSection.TraceMeta;
+    return;
+  } else if (line === TRACING_END) {
+    state.section = TraceParseSection.Stdout;
+    state.pendingValueLines = [];
+    state.lastResultKey = undefined;
+    return;
+  } else if (line === TRACING_CONTENT_START) {
+    state.section = TraceParseSection.TraceValue;
+    state.pendingValueLines = [];
+    return;
+  } else if (line === TRACING_CONTENT_END) {
+    commitPendingTraceValue(state);
+    state.section = TraceParseSection.TraceMeta;
+    state.pendingValueLines = [];
+    return;
+  }
+
+  switch (state.section) {
+    case TraceParseSection.TraceValue: {
+      state.pendingValueLines.push(line);
+      return;
+    }
+    case TraceParseSection.TraceMeta: {
+      const j = JSON.parse(line) as Omit<TraceResult, "value" | "hit">;
+      const key = traceKey(j);
+      state.lastResultKey = key;
+      const res = state.results.get(key);
+      if (res === undefined) {
+        state.results.set(key, {
+          ...j,
+          value: "",
+          hit: 1,
+        });
+      } else {
+        state.results.set(key, {
+          ...j,
+          value: res.value,
+          hit: res.hit + 1,
+        });
+      }
+      return;
+    }
+    case TraceParseSection.Stdout:
+      state.stdoutLines.push(line);
+      return;
+  }
+}
+
+async function parseTraceOutput(
+  stream: ReadableStream<string>,
+): Promise<{
   traceResults: TraceResult[];
   stdout: string;
-} {
-  const results = new Map<string, TraceResult>();
-  const stdoutLines: string[] = [];
-  let isInTrace = false;
-  let isInTraceContent = false;
-  let lastResultKey: string | undefined = undefined;
-  for (const line of lines) {
-    if (line === TRACING_START) {
-      isInTrace = true;
-      continue;
-    } else if (line === TRACING_END) {
-      isInTrace = false;
-      continue;
-    } else if (line === TRACING_CONTENT_START) {
-      isInTraceContent = true;
-      continue;
-    } else if (line === TRACING_CONTENT_END) {
-      isInTraceContent = false;
-      continue;
-    }
-    if (isInTraceContent) {
-      if (!lastResultKey) continue;
-      const value = line;
-      const res = results.get(lastResultKey);
-      if (!res) continue;
-      res.value = value;
-    } else if (isInTrace) {
-      const j = JSON.parse(line);
-      const key = traceKey(j);
-      lastResultKey = key;
-      const res = results.get(key);
-      if (res === undefined) {
-        results.set(key, { ...j, hit: 1 });
-      } else {
-        results.set(key, { ...j, hit: res.hit + 1 });
-      }
-    } else {
-      stdoutLines.push(line);
-    }
-  }
+}> {
+  const state = createTraceParseState();
+  await stream.pipeTo(
+    new WritableStream({
+      write(chunk) {
+        feedTraceLine(state, chunk);
+      },
+    }),
+  );
   return {
-    traceResults: [...results.values()],
-    stdout: stdoutLines.join("\n"),
+    traceResults: [...state.results.values()],
+    stdout: state.stdoutLines.join("\n"),
   };
 }
 
