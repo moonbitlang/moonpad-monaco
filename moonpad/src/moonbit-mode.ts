@@ -1036,7 +1036,7 @@ function traceCommandFactory() {
       }
       case "success": {
         const js = result.js;
-        const stdoutStream = moon.run(js);
+        const stdoutStream = moon.run(js, { blockingCredits: 64 });
         const parsed = await parseTraceOutput(stdoutStream, aborter.signal);
         if (!parsed) return;
         if (runningAborters.get(modelId) !== aborter) return;

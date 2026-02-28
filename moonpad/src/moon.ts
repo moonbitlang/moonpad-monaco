@@ -250,6 +250,11 @@ type TestResult = {
   message: string;
 };
 
+type RunOptions = {
+  // Enable worker-side blocking backpressure when SharedArrayBuffer is available.
+  blockingCredits?: number;
+};
+
 function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   let isInSection = false;
   let stdout = "";
@@ -277,27 +282,91 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   return stream;
 }
 
-function run(js: Uint8Array): ReadableStream<string> {
+function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
   const worker = new moonrunWorker();
+  const requestedCredits = options.blockingCredits ?? 0;
+  const creditsEnabled = requestedCredits > 0;
+  const initialCredits = creditsEnabled ? Math.max(1, requestedCredits) : 0;
+  const creditState =
+    initialCredits > 0 && typeof SharedArrayBuffer !== "undefined"
+      ? new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
+      : undefined;
+  let warnedMissingSharedBuffer = false;
+  const releaseCredit = () => {
+    if (!creditState) {
+      if (creditsEnabled && !warnedMissingSharedBuffer) {
+        warnedMissingSharedBuffer = true;
+        console.warn(
+          "[moonpad-run] SharedArrayBuffer unavailable; blocking backpressure disabled",
+        );
+      }
+      return;
+    }
+    Atomics.add(creditState, 0, 1);
+    Atomics.notify(creditState, 0, 1);
+  };
+  const pending: string[] = [];
+  let isDone = false;
+  let pendingError: Error | undefined = undefined;
+  let isClosed = false;
+  let controllerRef: ReadableStreamDefaultController<string> | undefined;
+  const closeWorker = () => {
+    if (isClosed) return;
+    isClosed = true;
+    worker.terminate();
+  };
+  const flush = () => {
+    const controller = controllerRef;
+    if (!controller || isClosed) return;
+    if (pendingError) {
+      closeWorker();
+      controller.error(pendingError);
+      return;
+    }
+    while (pending.length > 0 && (controller.desiredSize ?? 0) > 0) {
+      const chunk = pending.shift()!;
+      controller.enqueue(chunk);
+      releaseCredit();
+    }
+    if (isDone && pending.length === 0) {
+      closeWorker();
+      controller.close();
+    }
+  };
+  worker.onmessage = (e: MessageEvent<string | null | Error>) => {
+    if (isClosed) return;
+    if (e.data instanceof Error) {
+      pendingError = e.data;
+      flush();
+      return;
+    }
+    if (e.data === null) {
+      isDone = true;
+      flush();
+      return;
+    }
+    pending.push(e.data);
+    flush();
+  };
   return new ReadableStream<string>({
     start(controller) {
-      worker.onmessage = (e: MessageEvent<string | null | Error>) => {
-        if (e.data instanceof Error) {
-          worker.terminate();
-          controller.error(e.data);
-        } else {
-          if (e.data) {
-            controller.enqueue(e.data);
-          } else {
-            worker.terminate();
-            controller.close();
-          }
-        }
-      };
-      worker.postMessage(js);
+      controllerRef = controller;
+      if (creditState) {
+        Atomics.store(creditState, 0, initialCredits);
+        worker.postMessage({
+          js,
+          creditState: creditState.buffer as SharedArrayBuffer,
+        });
+      } else {
+        worker.postMessage(js);
+      }
+      flush();
+    },
+    pull() {
+      flush();
     },
     cancel() {
-      worker.terminate();
+      closeWorker();
     },
   });
 }

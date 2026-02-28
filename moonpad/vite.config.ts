@@ -20,6 +20,10 @@ import { defineConfig, Plugin } from "vite";
 import dts from "vite-plugin-dts";
 
 const dropLabels = process.env.NODE_ENV === "development" ? [] : ["DEV"];
+const crossOriginHeaders = {
+  "Cross-Origin-Opener-Policy": "same-origin",
+  "Cross-Origin-Embedder-Policy": "require-corp",
+};
 
 const plugin: Plugin = {
   name: "copy-worker",
@@ -43,6 +47,12 @@ export default defineConfig({
   plugins: [plugin, dts({ rollupTypes: true })],
   esbuild: {
     dropLabels,
+  },
+  server: {
+    headers: crossOriginHeaders,
+  },
+  preview: {
+    headers: crossOriginHeaders,
   },
   build: {
     lib: {
