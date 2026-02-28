@@ -990,10 +990,15 @@ function init(params: initParams): typeof moon {
 
 function traceCommandFactory() {
   const decorations = new Map<string, string[]>();
+  const runningAborters = new Map<string, AbortController>();
   return async (uri: string): Promise<string | undefined> => {
     const muri = monaco.Uri.parse(uri);
     const model = monaco.editor.getModel(muri);
     if (model === null) return;
+    const modelId = model.id;
+    runningAborters.get(modelId)?.abort();
+    const aborter = new AbortController();
+    runningAborters.set(modelId, aborter);
     const name = muri.path.split("/").at(-1)!;
     const result = await moon.compile({
       libInputs: [[name, model.getValue()]],
@@ -1001,23 +1006,28 @@ function traceCommandFactory() {
     });
     switch (result.kind) {
       case "error": {
+        if (runningAborters.get(modelId) !== aborter) return;
+        runningAborters.delete(modelId);
         console.error(result.diagnostics);
         return;
       }
       case "success": {
         const js = result.js;
         const stdoutStream = moon.run(js);
-        const parsed = await parseTraceOutput(stdoutStream);
+        const parsed = await parseTraceOutput(stdoutStream, aborter.signal);
+        if (!parsed) return;
+        if (runningAborters.get(modelId) !== aborter) return;
+        runningAborters.delete(modelId);
         const { traceResults, stdout } = parsed;
-        const oldDecorations = decorations.get(model.id) ?? [];
+        const oldDecorations = decorations.get(modelId) ?? [];
         const newDecorations = renderTraceResults(
           model,
           oldDecorations,
           traceResults,
         );
-        decorations.set(model.id, newDecorations);
+        decorations.set(modelId, newDecorations);
         let d = model.onDidChangeContent(() => {
-          decorations.set(model.id, model.deltaDecorations(newDecorations, []));
+          decorations.set(modelId, model.deltaDecorations(newDecorations, []));
           d.dispose();
         });
         return stdout;
@@ -1136,22 +1146,41 @@ function feedTraceLine(state: TraceParseState, line: string) {
 
 async function parseTraceOutput(
   stream: ReadableStream<string>,
-): Promise<{
-  traceResults: TraceResult[];
-  stdout: string;
-}> {
+  signal: AbortSignal,
+): Promise<
+  | {
+      traceResults: TraceResult[];
+      stdout: string;
+    }
+  | undefined
+> {
   const state = createTraceParseState();
-  await stream.pipeTo(
-    new WritableStream({
-      write(chunk) {
-        feedTraceLine(state, chunk);
-      },
-    }),
-  );
+  try {
+    await stream.pipeTo(
+      new WritableStream({
+        write(chunk) {
+          feedTraceLine(state, chunk);
+        },
+      }),
+      { signal },
+    );
+  } catch (error) {
+    if (isAbortError(error)) return;
+    throw error;
+  }
   return {
     traceResults: [...state.results.values()],
     stdout: state.stdoutLines.join("\n"),
   };
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
 }
 
 function renderTraceResults(
