@@ -34,7 +34,6 @@ type initParams = {
 type TraceModelState = {
   decorations: string[];
   aborter?: AbortController;
-  runToken: number;
   clearOnEdit?: monaco.IDisposable;
 };
 
@@ -43,7 +42,6 @@ const sharedTraceStates = new Map<string, TraceModelState>();
 function createTraceModelState(model: monaco.editor.ITextModel): TraceModelState {
   const state: TraceModelState = {
     decorations: [],
-    runToken: 0,
   };
   model.onWillDispose(() => {
     state.aborter?.abort();
@@ -1025,21 +1023,13 @@ function traceCommandFactory() {
     const state = sharedTraceStates.get(modelId) ?? createTraceModelState(model);
     state.clearOnEdit?.dispose();
     state.clearOnEdit = undefined;
-    if (state.decorations.length > 0) {
-      state.decorations = model.deltaDecorations(state.decorations, []);
-    }
+    state.decorations = model.deltaDecorations(state.decorations, []);
     state.aborter?.abort();
     const aborter = new AbortController();
     state.aborter = aborter;
-    const runToken = state.runToken + 1;
-    state.runToken = runToken;
     const isCurrentRun = () => {
       const current = sharedTraceStates.get(modelId);
-      return (
-        current !== undefined &&
-        current.runToken === runToken &&
-        current.aborter === aborter
-      );
+      return current !== undefined && current.aborter === aborter;
     };
     const name = muri.path.split("/").at(-1)!;
     const result = await moon.compile({
@@ -1080,9 +1070,7 @@ function traceCommandFactory() {
         };
         try {
           await moon
-            .runTrace(js, {
-              signal: aborter.signal,
-            })
+            .runTrace(js)
             .pipeTo(
               new WritableStream<moon.TraceRunOutput>({
                 write(chunk) {

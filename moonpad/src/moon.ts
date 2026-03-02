@@ -250,10 +250,6 @@ type TestResult = {
   message: string;
 };
 
-type TraceRunOptions = {
-  signal?: AbortSignal;
-};
-
 type TraceResult = {
   name: string;
   value: string;
@@ -303,7 +299,7 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
 
 function run(js: Uint8Array): ReadableStream<string> {
   const worker = new moonrunWorker();
-  worker.postMessage(js);
+  worker.postMessage({ js });
   return new ReadableStream<string>({
     start(controller) {
       worker.onmessage = (e: MessageEvent<string | null | Error>) => {
@@ -323,81 +319,34 @@ function run(js: Uint8Array): ReadableStream<string> {
 
 function runTrace(
   js: Uint8Array,
-  options: TraceRunOptions = {},
 ): ReadableStream<TraceRunOutput> {
   const worker = new moonrunWorker();
-  const pending: TraceRunOutput[] = [];
-  let isDone = false;
-  let pendingError: Error | undefined = undefined;
   let isClosed = false;
-  let controllerRef:
-    | ReadableStreamDefaultController<TraceRunOutput>
-    | undefined;
-  let detachAbortListener: (() => void) | undefined = undefined;
   const closeWorker = () => {
     if (isClosed) return;
     isClosed = true;
-    detachAbortListener?.();
-    detachAbortListener = undefined;
     worker.terminate();
-  };
-  const flush = () => {
-    const controller = controllerRef;
-    if (!controller || isClosed) return;
-    if (pendingError) {
-      closeWorker();
-      controller.error(pendingError);
-      return;
-    }
-    while (pending.length > 0 && (controller.desiredSize ?? 0) > 0) {
-      controller.enqueue(pending.shift()!);
-    }
-    if (isDone && pending.length === 0) {
-      closeWorker();
-      controller.close();
-    }
-  };
-  worker.onmessage = (e: MessageEvent<TraceRunOutput | null | Error>) => {
-    if (isClosed) return;
-    if (e.data instanceof Error) {
-      pendingError = e.data;
-      flush();
-      return;
-    }
-    if (e.data === null) {
-      isDone = true;
-      flush();
-      return;
-    }
-    pending.push(e.data);
-    flush();
   };
   return new ReadableStream<TraceRunOutput>({
     start(controller) {
-      controllerRef = controller;
-      if (options.signal) {
-        if (options.signal.aborted) {
+      worker.onmessage = (e: MessageEvent<TraceRunOutput | null | Error>) => {
+        if (isClosed) return;
+        if (e.data instanceof Error) {
+          closeWorker();
+          controller.error(e.data);
+          return;
+        }
+        if (e.data === null) {
           closeWorker();
           controller.close();
           return;
         }
-        const abortHandler = () => {
-          closeWorker();
-          controller.close();
-        };
-        options.signal.addEventListener("abort", abortHandler, { once: true });
-        detachAbortListener = () => {
-          options.signal?.removeEventListener("abort", abortHandler);
-        };
-      }
+        controller.enqueue(e.data);
+      };
       worker.postMessage({
         js,
         traceAggregate: true,
       });
-      flush();
-    },
-    pull() {
-      flush();
     },
     cancel() {
       closeWorker();

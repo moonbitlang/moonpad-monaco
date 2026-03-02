@@ -14,12 +14,10 @@
  * limitations under the License.
  */
 
-type RunRequest =
-  | Uint8Array
-  | {
-      js: Uint8Array;
-      traceAggregate?: boolean;
-    };
+type RunRequest = {
+  js: Uint8Array;
+  traceAggregate?: boolean;
+};
 
 type TraceResult = {
   name: string;
@@ -31,16 +29,6 @@ type TraceResult = {
   hit: number;
 };
 
-type TraceWorkerMessage =
-  | {
-      kind: "trace-delta";
-      entries: TraceResult[];
-    }
-  | {
-      kind: "stdout-batch";
-      lines: string[];
-    };
-
 const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
 const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
 const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
@@ -49,16 +37,11 @@ const TRACE_FLUSH_INTERVAL_MS = 16;
 const TRACE_FLUSH_EVERY_COMMITS = 32;
 
 self.onmessage = async (e: MessageEvent<RunRequest>) => {
-  const data = e.data;
-  if (data instanceof Uint8Array) {
-    runJs(data);
+  if (e.data.traceAggregate) {
+    runJsAggregate(e.data.js);
     return;
   }
-  if (data.traceAggregate) {
-    runJsAggregate(data.js);
-    return;
-  }
-  runJs(data.js);
+  runJs(e.data.js);
 };
 
 async function runJs(js: Uint8Array) {
@@ -102,7 +85,6 @@ function traceKey(
 
 type WorkerTraceParseState = {
   section: "stdout" | "meta" | "value";
-  pendingChunkLine: string;
   pendingValueLines: string[];
   lastResultKey: string | undefined;
   results: Map<string, TraceResult>;
@@ -120,7 +102,6 @@ async function runJsAggregate(js: Uint8Array) {
   );
   const state: WorkerTraceParseState = {
     section: "stdout",
-    pendingChunkLine: "",
     pendingValueLines: [],
     lastResultKey: undefined,
     results: new Map(),
@@ -129,23 +110,20 @@ async function runJsAggregate(js: Uint8Array) {
     flushTimer: undefined,
     commitsSinceFlush: 0,
   };
-  const post = (message: TraceWorkerMessage) => {
-    self.postMessage(message);
-  };
   const flushNow = () => {
     if (state.flushTimer !== undefined) {
       clearTimeout(state.flushTimer);
       state.flushTimer = undefined;
     }
     if (state.pendingDeltas.size > 0) {
-      post({
+      self.postMessage({
         kind: "trace-delta",
         entries: [...state.pendingDeltas.values()],
       });
       state.pendingDeltas.clear();
     }
     if (state.pendingStdout.length > 0) {
-      post({
+      self.postMessage({
         kind: "stdout-batch",
         lines: state.pendingStdout,
       });
@@ -227,19 +205,13 @@ async function runJsAggregate(js: Uint8Array) {
     scheduleFlush();
   };
   const feedTraceChunk = (chunk: string) => {
-    if (
-      !chunk.includes("\n") &&
-      !chunk.includes("\r") &&
-      state.pendingChunkLine === ""
-    ) {
-      feedTraceLine(chunk);
-      return;
-    }
-    const text = state.pendingChunkLine + chunk;
-    const lines = text.split(/\r?\n/);
-    state.pendingChunkLine = lines.pop() ?? "";
-    for (const line of lines) {
-      feedTraceLine(line);
+    const lines = chunk.split(/\r?\n/);
+    const lastIndex =
+      chunk.endsWith("\n") || chunk.endsWith("\r")
+        ? lines.length - 1
+        : lines.length;
+    for (let i = 0; i < lastIndex; i += 1) {
+      feedTraceLine(lines[i]!);
     }
   };
 
@@ -256,10 +228,6 @@ async function runJsAggregate(js: Uint8Array) {
     self.postMessage(e);
     return;
   } finally {
-    if (state.pendingChunkLine.length > 0) {
-      feedTraceLine(state.pendingChunkLine);
-      state.pendingChunkLine = "";
-    }
     flushNow();
     URL.revokeObjectURL(jsUrl);
     globalThis.console.log = oldLog;
