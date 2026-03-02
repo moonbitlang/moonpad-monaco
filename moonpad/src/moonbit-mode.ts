@@ -31,6 +31,27 @@ type initParams = {
   codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
 
+type TraceModelState = {
+  decorations: string[];
+  aborter?: AbortController;
+  clearOnEdit?: monaco.IDisposable;
+};
+
+const sharedTraceStates = new Map<string, TraceModelState>();
+
+function createTraceModelState(model: monaco.editor.ITextModel): TraceModelState {
+  const state: TraceModelState = {
+    decorations: [],
+  };
+  model.onWillDispose(() => {
+    state.aborter?.abort();
+    state.clearOnEdit?.dispose();
+    sharedTraceStates.delete(model.id);
+  });
+  sharedTraceStates.set(model.id, state);
+  return state;
+}
+
 function ensureDirSync(fs: mfs.MFS, path: string) {
   if (!fs.existsSync(path)) {
     fs.mkdirSync(path, { recursive: true });
@@ -982,133 +1003,173 @@ function init(params: initParams): typeof moon {
     codeLensProvider,
   );
   moon.init(mooncWorkerFactory);
+  const traceMain = traceCommandFactory();
   monaco.editor.registerCommand("moonbit-lsp/trace-main", async (_, param) => {
-    traceCommandFactory()(param.fileUri);
+    const fileUri =
+      (param as { fileUri?: string; uri?: string } | undefined)?.fileUri ??
+      (param as { fileUri?: string; uri?: string } | undefined)?.uri;
+    if (!fileUri) return;
+    traceMain(fileUri);
   });
   return moon;
 }
 
 function traceCommandFactory() {
-  const decorations = new Map<string, string[]>();
   return async (uri: string): Promise<string | undefined> => {
     const muri = monaco.Uri.parse(uri);
     const model = monaco.editor.getModel(muri);
     if (model === null) return;
+    const modelId = model.id;
+    const state = sharedTraceStates.get(modelId) ?? createTraceModelState(model);
+    state.clearOnEdit?.dispose();
+    state.clearOnEdit = undefined;
+    state.decorations = model.deltaDecorations(state.decorations, []);
+    state.aborter?.abort();
+    const aborter = new AbortController();
+    state.aborter = aborter;
+    const isCurrentRun = () => {
+      const current = sharedTraceStates.get(modelId);
+      return current !== undefined && current.aborter === aborter;
+    };
     const name = muri.path.split("/").at(-1)!;
     const result = await moon.compile({
       libInputs: [[name, model.getValue()]],
       enableValueTracing: true,
     });
+    if (!isCurrentRun()) return;
     switch (result.kind) {
       case "error": {
+        if (isCurrentRun()) {
+          state.aborter = undefined;
+        }
         console.error(result.diagnostics);
         return;
       }
       case "success": {
         const js = result.js;
-        const stdoutStream = moon.run(js);
-        const lines = await collect(stdoutStream);
-        const { traceResults, stdout } = parseTraceOutput(lines);
-        const oldDecorations = decorations.get(model.id) ?? [];
-        const newDecorations = renderTraceResults(
-          model,
-          oldDecorations,
-          traceResults,
-        );
-        decorations.set(model.id, newDecorations);
-        let d = model.onDidChangeContent(() => {
-          decorations.set(model.id, model.deltaDecorations(newDecorations, []));
-          d.dispose();
+        const traceResults = new Map<string, TraceResult>();
+        const stdoutLines: string[] = [];
+        const applyTraceResults = () => {
+          if (!isCurrentRun()) return;
+          const currentTraceResults = [...traceResults.values()];
+          const filteredTraceResults = currentTraceResults.filter((res) =>
+            traceResultMatchesModel(res, muri.path, name),
+          );
+          const traceResultsToRender =
+            filteredTraceResults.length > 0 || currentTraceResults.length === 0
+              ? filteredTraceResults
+              : currentTraceResults;
+          const normalizedTraceResults = dedupeTraceResultsForRender(
+            traceResultsToRender,
+          );
+          state.decorations = renderTraceResults(
+            model,
+            state.decorations,
+            normalizedTraceResults,
+          );
+        };
+        try {
+          await moon
+            .runTrace(js)
+            .pipeTo(
+              new WritableStream<moon.TraceRunOutput>({
+                write(chunk) {
+                  if (chunk.kind === "stdout-batch") {
+                    stdoutLines.push(...chunk.lines);
+                    return;
+                  }
+                  for (const entry of chunk.entries) {
+                    traceResults.set(traceKey(entry), entry);
+                  }
+                  applyTraceResults();
+                },
+              }),
+              { signal: aborter.signal },
+            );
+        } catch (error) {
+          if (isAbortError(error)) {
+            if (isCurrentRun()) state.aborter = undefined;
+            return;
+          }
+          throw error;
+        }
+        if (!isCurrentRun()) return;
+        state.aborter = undefined;
+        applyTraceResults();
+        state.clearOnEdit = model.onDidChangeContent(() => {
+          state.decorations = model.deltaDecorations(state.decorations, []);
+          state.clearOnEdit?.dispose();
+          state.clearOnEdit = undefined;
         });
-        return stdout;
+        return stdoutLines.join("\n");
       }
     }
   };
 }
 
-type TraceResult = {
-  name: string;
-  value: string;
-  line: number;
-  start_column: number;
-  end_column: number;
-  hit: number;
-};
+type TraceResult = moon.TraceResult;
 
-const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";
-const TRACING_CONTENT_START = "######MOONBIT_VALUE_TRACING_CONTENT_START######";
-
-const TRACING_END = "######MOONBIT_VALUE_TRACING_END######";
-const TRACING_CONTENT_END = "######MOONBIT_VALUE_TRACING_CONTENT_END######";
-
-async function collect(s: ReadableStream<string>): Promise<string[]> {
-  const lines: string[] = [];
-  await s.pipeTo(
-    new WritableStream({
-      write(chunk) {
-        lines.push(chunk);
-      },
-    }),
-  );
-  return lines;
-}
-
-function traceKey(trace: TraceResult): string {
+function traceKey(
+  trace: Pick<
+    TraceResult,
+    "name" | "line" | "start_column" | "end_column" | "filepath"
+  >,
+): string {
   return JSON.stringify({
     name: trace.name,
     line: trace.line,
     start_column: trace.start_column,
     end_column: trace.end_column,
+    filepath: trace.filepath ?? "",
   });
 }
 
-function parseTraceOutput(lines: string[]): {
-  traceResults: TraceResult[];
-  stdout: string;
-} {
-  const results = new Map<string, TraceResult>();
-  const stdoutLines: string[] = [];
-  let isInTrace = false;
-  let isInTraceContent = false;
-  let lastResultKey: string | undefined = undefined;
-  for (const line of lines) {
-    if (line === TRACING_START) {
-      isInTrace = true;
-      continue;
-    } else if (line === TRACING_END) {
-      isInTrace = false;
-      continue;
-    } else if (line === TRACING_CONTENT_START) {
-      isInTraceContent = true;
-      continue;
-    } else if (line === TRACING_CONTENT_END) {
-      isInTraceContent = false;
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: string }).name === "AbortError"
+  );
+}
+
+function traceResultMatchesModel(
+  res: TraceResult,
+  modelPath: string,
+  modelName: string,
+): boolean {
+  const filepath = res.filepath;
+  if (!filepath) return true;
+  return (
+    filepath === modelPath ||
+    filepath === modelName ||
+    filepath.endsWith(`/${modelName}`) ||
+    filepath.endsWith(`\\${modelName}`)
+  );
+}
+
+function dedupeTraceResultsForRender(results: TraceResult[]): TraceResult[] {
+  const deduped = new Map<string, TraceResult>();
+  for (const res of results) {
+    const key = JSON.stringify({
+      name: res.name,
+      line: res.line,
+      start_column: res.start_column,
+      end_column: res.end_column,
+    });
+    const prev = deduped.get(key);
+    if (!prev) {
+      deduped.set(key, { ...res });
       continue;
     }
-    if (isInTraceContent) {
-      if (!lastResultKey) continue;
-      const value = line;
-      const res = results.get(lastResultKey);
-      if (!res) continue;
-      res.value = value;
-    } else if (isInTrace) {
-      const j = JSON.parse(line);
-      const key = traceKey(j);
-      lastResultKey = key;
-      const res = results.get(key);
-      if (res === undefined) {
-        results.set(key, { ...j, hit: 1 });
-      } else {
-        results.set(key, { ...j, hit: res.hit + 1 });
-      }
-    } else {
-      stdoutLines.push(line);
-    }
+    deduped.set(key, {
+      ...prev,
+      value: res.value || prev.value,
+      hit: prev.hit + res.hit,
+      filepath: prev.filepath ?? res.filepath,
+    });
   }
-  return {
-    traceResults: [...results.values()],
-    stdout: stdoutLines.join("\n"),
-  };
+  return [...deduped.values()];
 }
 
 function renderTraceResults(

@@ -21,6 +21,7 @@ import * as vscodeUri from "vscode-uri";
 import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import template from "./template.mbt?raw";
+import type { TraceResult, TraceRunOutput } from "./trace-types";
 
 const MOON_TEST_DELIMITER_BEGIN = "----- BEGIN MOON TEST RESULT -----";
 const MOON_TEST_DELIMITER_END = "----- END MOON TEST RESULT -----";
@@ -279,7 +280,7 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
 
 function run(js: Uint8Array): ReadableStream<string> {
   const worker = new moonrunWorker();
-  worker.postMessage(js);
+  worker.postMessage({ js });
   return new ReadableStream<string>({
     start(controller) {
       worker.onmessage = (e: MessageEvent<string | null | Error>) => {
@@ -297,6 +298,43 @@ function run(js: Uint8Array): ReadableStream<string> {
   });
 }
 
+function runTrace(
+  js: Uint8Array,
+): ReadableStream<TraceRunOutput> {
+  const worker = new moonrunWorker();
+  let isClosed = false;
+  const closeWorker = () => {
+    if (isClosed) return;
+    isClosed = true;
+    worker.terminate();
+  };
+  return new ReadableStream<TraceRunOutput>({
+    start(controller) {
+      worker.onmessage = (e: MessageEvent<TraceRunOutput | null | Error>) => {
+        if (isClosed) return;
+        if (e.data instanceof Error) {
+          closeWorker();
+          controller.error(e.data);
+          return;
+        }
+        if (e.data === null) {
+          closeWorker();
+          controller.close();
+          return;
+        }
+        controller.enqueue(e.data);
+      };
+      worker.postMessage({
+        js,
+        traceAggregate: true,
+      });
+    },
+    cancel() {
+      closeWorker();
+    },
+  });
+}
+
 function test(js: Uint8Array): ReadableStream<TestOutput> {
   return run(js).pipeThrough(parseTestOutputTransformStream());
 }
@@ -306,4 +344,5 @@ function init(factory: () => Worker) {
   mooncWorkerFactory = factory;
 }
 
-export { compile, init, run, test };
+export { compile, init, run, runTrace, test };
+export type { TraceResult, TraceRunOutput };
