@@ -14,19 +14,11 @@
  * limitations under the License.
  */
 
+import type { TraceResult } from "./trace-types";
+
 type RunRequest = {
   js: Uint8Array;
   traceAggregate?: boolean;
-};
-
-type TraceResult = {
-  name: string;
-  value: string;
-  line: number;
-  start_column: number;
-  end_column: number;
-  filepath?: string;
-  hit: number;
 };
 
 const TRACING_START = "######MOONBIT_VALUE_TRACING_START######";

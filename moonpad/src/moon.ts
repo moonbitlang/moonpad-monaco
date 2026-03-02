@@ -21,6 +21,7 @@ import * as vscodeUri from "vscode-uri";
 import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import template from "./template.mbt?raw";
+import type { TraceResult, TraceRunOutput } from "./trace-types";
 
 const MOON_TEST_DELIMITER_BEGIN = "----- BEGIN MOON TEST RESULT -----";
 const MOON_TEST_DELIMITER_END = "----- END MOON TEST RESULT -----";
@@ -249,26 +250,6 @@ type TestResult = {
   test_name: string;
   message: string;
 };
-
-type TraceResult = {
-  name: string;
-  value: string;
-  line: number;
-  start_column: number;
-  end_column: number;
-  filepath?: string;
-  hit: number;
-};
-
-type TraceRunOutput =
-  | {
-      kind: "trace-delta";
-      entries: TraceResult[];
-    }
-  | {
-      kind: "stdout-batch";
-      lines: string[];
-    };
 
 function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
   let isInSection = false;
