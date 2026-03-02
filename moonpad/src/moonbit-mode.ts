@@ -39,9 +39,20 @@ type TraceModelState = {
 };
 
 const sharedTraceStates = new Map<string, TraceModelState>();
-let sharedTraceCommand:
-  | ((uri: string) => Promise<string | undefined>)
-  | undefined = undefined;
+
+function createTraceModelState(model: monaco.editor.ITextModel): TraceModelState {
+  const state: TraceModelState = {
+    decorations: [],
+    runToken: 0,
+  };
+  model.onWillDispose(() => {
+    state.aborter?.abort();
+    state.clearOnEdit?.dispose();
+    sharedTraceStates.delete(model.id);
+  });
+  sharedTraceStates.set(model.id, state);
+  return state;
+}
 
 function ensureDirSync(fs: mfs.MFS, path: string) {
   if (!fs.existsSync(path)) {
@@ -1043,17 +1054,12 @@ function runMainCommandFactory() {
 }
 
 function traceCommandFactory() {
-  if (sharedTraceCommand) return sharedTraceCommand;
-  sharedTraceCommand = async (uri: string): Promise<string | undefined> => {
+  return async (uri: string): Promise<string | undefined> => {
     const muri = monaco.Uri.parse(uri);
     const model = monaco.editor.getModel(muri);
     if (model === null) return;
     const modelId = model.id;
-    const state = sharedTraceStates.get(modelId) ?? {
-      decorations: [],
-      runToken: 0,
-    };
-    sharedTraceStates.set(modelId, state);
+    const state = sharedTraceStates.get(modelId) ?? createTraceModelState(model);
     state.clearOnEdit?.dispose();
     state.clearOnEdit = undefined;
     if (state.decorations.length > 0) {
@@ -1149,18 +1155,9 @@ function traceCommandFactory() {
       }
     }
   };
-  return sharedTraceCommand;
 }
 
-type TraceResult = {
-  name: string;
-  value: string;
-  line: number;
-  start_column: number;
-  end_column: number;
-  filepath?: string;
-  hit: number;
-};
+type TraceResult = moon.TraceResult;
 
 function traceKey(
   trace: Pick<

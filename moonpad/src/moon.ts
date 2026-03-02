@@ -251,9 +251,12 @@ type TestResult = {
 };
 
 type RunOptions = {
+  signal?: AbortSignal;
+};
+
+type TraceRunOptions = RunOptions & {
   // Enable worker-side blocking backpressure when SharedArrayBuffer is available.
   blockingCredits?: number;
-  signal?: AbortSignal;
 };
 
 type TraceResult = {
@@ -305,32 +308,7 @@ function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
 
 function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
   const worker = new moonrunWorker();
-  const requestedCredits = options.blockingCredits ?? 0;
-  const creditsEnabled = requestedCredits > 0;
-  const initialCredits = creditsEnabled ? Math.max(1, requestedCredits) : 0;
-  const creditState =
-    initialCredits > 0 && typeof SharedArrayBuffer !== "undefined"
-      ? new Int32Array(new SharedArrayBuffer(Int32Array.BYTES_PER_ELEMENT))
-      : undefined;
-  let warnedMissingSharedBuffer = false;
-  const releaseCredit = () => {
-    if (!creditState) {
-      if (creditsEnabled && !warnedMissingSharedBuffer) {
-        warnedMissingSharedBuffer = true;
-        console.warn(
-          "[moonpad-run] SharedArrayBuffer unavailable; blocking backpressure disabled",
-        );
-      }
-      return;
-    }
-    Atomics.add(creditState, 0, 1);
-    Atomics.notify(creditState, 0, 1);
-  };
-  const pending: string[] = [];
-  let isDone = false;
-  let pendingError: Error | undefined = undefined;
   let isClosed = false;
-  let controllerRef: ReadableStreamDefaultController<string> | undefined;
   let detachAbortListener: (() => void) | undefined = undefined;
   const closeWorker = () => {
     if (isClosed) return;
@@ -339,42 +317,22 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
     detachAbortListener = undefined;
     worker.terminate();
   };
-  const flush = () => {
-    const controller = controllerRef;
-    if (!controller || isClosed) return;
-    if (pendingError) {
-      closeWorker();
-      controller.error(pendingError);
-      return;
-    }
-    while (pending.length > 0 && (controller.desiredSize ?? 0) > 0) {
-      const chunk = pending.shift()!;
-      controller.enqueue(chunk);
-      releaseCredit();
-    }
-    if (isDone && pending.length === 0) {
-      closeWorker();
-      controller.close();
-    }
-  };
-  worker.onmessage = (e: MessageEvent<string | null | Error>) => {
-    if (isClosed) return;
-    if (e.data instanceof Error) {
-      pendingError = e.data;
-      flush();
-      return;
-    }
-    if (e.data === null) {
-      isDone = true;
-      flush();
-      return;
-    }
-    pending.push(e.data);
-    flush();
-  };
   return new ReadableStream<string>({
     start(controller) {
-      controllerRef = controller;
+      worker.onmessage = (e: MessageEvent<string | null | Error>) => {
+        if (isClosed) return;
+        if (e.data instanceof Error) {
+          closeWorker();
+          controller.error(e.data);
+          return;
+        }
+        if (e.data === null) {
+          closeWorker();
+          controller.close();
+          return;
+        }
+        controller.enqueue(e.data);
+      };
       if (options.signal) {
         if (options.signal.aborted) {
           closeWorker();
@@ -390,19 +348,7 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
           options.signal?.removeEventListener("abort", abortHandler);
         };
       }
-      if (creditState) {
-        Atomics.store(creditState, 0, initialCredits);
-        worker.postMessage({
-          js,
-          creditState: creditState.buffer as SharedArrayBuffer,
-        });
-      } else {
-        worker.postMessage(js);
-      }
-      flush();
-    },
-    pull() {
-      flush();
+      worker.postMessage(js);
     },
     cancel() {
       closeWorker();
@@ -412,7 +358,7 @@ function run(js: Uint8Array, options: RunOptions = {}): ReadableStream<string> {
 
 function runTrace(
   js: Uint8Array,
-  options: RunOptions = {},
+  options: TraceRunOptions = {},
 ): ReadableStream<TraceRunOutput> {
   const worker = new moonrunWorker();
   const requestedCredits = options.blockingCredits ?? 0;
@@ -502,7 +448,7 @@ function runTrace(
           options.signal?.removeEventListener("abort", abortHandler);
         };
       }
-      if (creditState) {
+      if (creditState !== undefined) {
         Atomics.store(creditState, 0, initialCredits);
         worker.postMessage({
           js,
