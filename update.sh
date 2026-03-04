@@ -7,3 +7,7 @@ popd
 pushd ./moonpad
   pnpm up @moonbit/moonc-worker @moonbit/analyzer
 popd
+
+pushd ./moon
+  pnpm up @moonbit/moonc-worker
+popd
