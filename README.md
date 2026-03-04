@@ -6,6 +6,12 @@
 npm i @moonbit/moonpad-monaco
 ```
 
+or
+
+```shell
+npm i @moonbit/moon
+```
+
 ## Usage
 
 see `examples` for usage
@@ -23,6 +29,11 @@ cd -
 
 # build moonpad
 cd moonpad
+npm run build
+cd -
+
+# build moon
+cd moon
 npm run build
 cd -
 

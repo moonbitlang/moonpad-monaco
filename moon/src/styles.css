@@ -1,0 +1,40 @@
+body {
+  margin: 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Courier New", monospace;
+}
+
+#app {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  grid-template-rows: auto 1fr auto 1fr;
+  height: 100vh;
+  box-sizing: border-box;
+}
+
+#code,
+#output {
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  padding: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+#code {
+  resize: vertical;
+}
+
+#output {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow: auto;
+  background: #fafafa;
+}
+
+#run {
+  width: fit-content;
+}

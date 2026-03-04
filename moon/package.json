@@ -1,0 +1,41 @@
+{
+  "name": "@moonbit/moon",
+  "version": "0.1.202602254",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "check": "tsc --noEmit",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "format": "prettier --write .",
+    "prepublish": "tsc && vite build"
+  },
+  "license": "Apache-2.0",
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "import": "./dist/moon.js",
+      "types": "./dist/moon.d.ts"
+    }
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "core": "workspace:^",
+    "prettier": "^3.4.2",
+    "prettier-plugin-organize-imports": "^4.1.0",
+    "typescript": "~5.7.2",
+    "vite": "^6.0.5",
+    "vite-plugin-dts": "^4.4.0"
+  },
+  "dependencies": {
+    "@moonbit/moonc-worker": "^0.1.202602253",
+    "comlink": "^4.4.2"
+  },
+  "prettier": {
+    "plugins": [
+      "prettier-plugin-organize-imports"
+    ]
+  }
+}
