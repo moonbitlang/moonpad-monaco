@@ -1,6 +1,6 @@
 {
   "name": "@moonbit/moon",
-  "version": "0.1.202602254",
+  "version": "0.1.202602255",
   "type": "module",
   "scripts": {
     "dev": "vite",
