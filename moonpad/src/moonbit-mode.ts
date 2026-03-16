@@ -1148,6 +1148,13 @@ function traceResultMatchesModel(
   );
 }
 
+function formatTraceValue(value: string): string {
+  const oneLine = value.split("\n").join("\\n");
+  const maxLen = 160;
+  if (oneLine.length <= maxLen) return oneLine;
+  return `${oneLine.slice(0, maxLen)}...`;
+}
+
 function dedupeTraceResultsForRender(results: TraceResult[]): TraceResult[] {
   const deduped = new Map<string, TraceResult>();
   for (const res of results) {
@@ -1178,14 +1185,25 @@ function renderTraceResults(
   results: TraceResult[],
 ): string[] {
   const newDecorations: monaco.editor.IModelDeltaDecoration[] = [];
+  const lineCount = model.getLineCount();
   for (const res of results) {
     const line = res.line;
-    const character = model.getLineLastNonWhitespaceColumn(line);
+    if (line < 1 || line > lineCount) continue;
+    const maxColumn = model.getLineMaxColumn(line);
+    const nonWhitespace = model.getLineLastNonWhitespaceColumn(line);
+    const character = nonWhitespace > 0 ? nonWhitespace : 1;
+    const rangeStart = Math.min(maxColumn - 1, character);
+    const startColumn = Math.max(1, rangeStart);
+    const endColumn = Math.min(maxColumn, startColumn + 1);
+    if (endColumn <= startColumn) continue;
+    const content = `${res.name} = ${formatTraceValue(res.value)}${
+      res.hit > 1 ? ` (${res.hit} hits)` : ""
+    }`;
     newDecorations.push({
-      range: new monaco.Range(line, character - 1, line, character),
+      range: new monaco.Range(line, startColumn, line, endColumn),
       options: {
         after: {
-          content: `${res.name} = ${res.value}${res.hit > 1 ? ` (${res.hit} hits)` : ""}`,
+          content,
           inlineClassName: "moonbit-trace",
           cursorStops: monaco.editor.InjectedTextCursorStops.None,
         },
