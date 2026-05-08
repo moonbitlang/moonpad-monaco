@@ -33,8 +33,8 @@ importers:
   moon:
     dependencies:
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202602253
-        version: 0.1.202602253
+        specifier: ^0.1.202604291
+        version: 0.1.202604291
       comlink:
         specifier: ^4.4.2
         version: 4.4.2
@@ -64,11 +64,11 @@ importers:
   moonpad:
     dependencies:
       '@moonbit/analyzer':
-        specifier: ^0.1.202602253
-        version: 0.1.202602253
+        specifier: ^0.1.202604291
+        version: 0.1.202604291
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202602253
-        version: 0.1.202602253
+        specifier: ^0.1.202604291
+        version: 0.1.202604291
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -332,11 +332,11 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202602253':
-    resolution: {integrity: sha512-S3ev6tFN6XpH/k4KYbDML4IWDe/eGKW/QV1LAC0RBBo1A+h+h+XHOC5o75iQ94TPFe9SW6d5BYqKQzFp7mhFJA==}
+  '@moonbit/analyzer@0.1.202604291':
+    resolution: {integrity: sha512-YwhutHOkGzAUtNvsqG5/X4o+X9muBYlv3MIhJiodVnzH2HvmglKYB26ctGKW2eK/418qI9NPp3bzPH88xQxOUw==}
 
-  '@moonbit/moonc-worker@0.1.202602253':
-    resolution: {integrity: sha512-YnLBkCCOFr7tFvVv9iMhnkTDmRlCq1e8sJfyQrWw4jRv7b2NyPfAXV1Owl27hy36A2EW0XivvkKrdN2y0ygQYA==}
+  '@moonbit/moonc-worker@0.1.202604291':
+    resolution: {integrity: sha512-M0ZPApdcJ4SCre0Mq6yp/feVJ6+MyaSsk5xUaSpUh/wstzNafaByBKP65jQ4HS00QI/0Z4Mzlx26JfSaepZ6YA==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1332,9 +1332,9 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202602253': {}
+  '@moonbit/analyzer@0.1.202604291': {}
 
-  '@moonbit/moonc-worker@0.1.202602253': {}
+  '@moonbit/moonc-worker@0.1.202604291': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true

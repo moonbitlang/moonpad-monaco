@@ -30,7 +30,7 @@
     "vite-plugin-dts": "^4.4.0"
   },
   "dependencies": {
-    "@moonbit/moonc-worker": "^0.1.202602253",
+    "@moonbit/moonc-worker": "^0.1.202604291",
     "comlink": "^4.4.2"
   },
   "prettier": {
