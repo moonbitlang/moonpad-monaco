@@ -28,9 +28,6 @@ jobs:
           pushd core
             pnpm build
           popd
-          pushd moon
-            pnpm version patch --no-git-tag-version -m "%s [skip ci]"
-          popd
           pushd moonpad
             pnpm version patch --no-git-tag-version -m "%s [skip ci]"
           popd
@@ -38,9 +35,6 @@ jobs:
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add .
           git commit -m "chore: bump version [skip-ci]"
-          pushd moon
-            pnpm publish --access public
-          popd
           pushd moonpad
             pnpm publish --access public
           popd
