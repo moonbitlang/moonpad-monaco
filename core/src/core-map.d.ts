@@ -14,10 +14,20 @@
  * limitations under the License.
  */
 
-declare const coreMap: Record<string, Uint8Array>
-declare const corePkgs: string[]
+declare const coreMap: Record<string, Uint8Array>;
+declare const corePkgs: string[];
 declare function getLoadPkgsParams(
-  target?: 'wasm-gc' | 'wasm' | 'js',
-): [importPath: string, mi: Uint8Array][]
+  target?: "wasm-gc" | "wasm" | "js",
+): [importPath: string, mi: Uint8Array][];
+declare function getCoreFile(path: string): Promise<Uint8Array>;
+declare function getCoreRuntimeFiles(
+  target?: "js",
+): Promise<[abortCore: Uint8Array, coreCore: Uint8Array]>;
 
-export { coreMap, getLoadPkgsParams }
+export {
+  coreMap,
+  corePkgs,
+  getCoreFile,
+  getCoreRuntimeFiles,
+  getLoadPkgsParams,
+};

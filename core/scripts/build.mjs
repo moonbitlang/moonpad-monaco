@@ -1,28 +1,28 @@
-import * as esbuild from 'esbuild'
-import fs from 'node:fs'
-import { generate } from './generate.mjs'
+import * as esbuild from "esbuild";
+import fs from "node:fs";
+import { generate } from "./generate.mjs";
 
-const ext = ['.mbt', '.mi', '.json', '.gz']
+const ext = [".mbt", ".mi", ".json", ".gz", ".core"];
 
-const loader = ext.reduce((acc, e) => ({ ...acc, [e]: 'binary' }), {})
+const loader = ext.reduce((acc, e) => ({ ...acc, [e]: "binary" }), {});
 
 await esbuild.build({
-  entryPoints: ['src/index.js'],
-  outfile: 'dist/index.js',
+  entryPoints: ["src/index.js"],
+  outfile: "dist/index.js",
   bundle: true,
-  format: 'esm',
+  format: "esm",
   loader,
   plugins: [
     {
-      name: 'generate',
+      name: "generate",
       setup(build) {
         build.onStart(() => {
-          generate()
-        })
+          generate();
+        });
         build.onEnd(() => {
-          fs.copyFileSync('src/core-map.d.ts', 'dist/index.d.ts')
-        })
+          fs.copyFileSync("src/core-map.d.ts", "dist/index.d.ts");
+        });
       },
     },
   ],
-})
+});

@@ -1,7 +1,24 @@
 import cp from "node:child_process";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+
+function getMoonHome() {
+  return process.env.MOON_HOME ?? path.join(os.homedir(), ".moon");
+}
+
+function copyCore(data) {
+  const source = path.join(getMoonHome(), "lib", "core");
+  const dest = path.join(data, "lib", "core");
+  if (!fs.existsSync(source)) {
+    throw new Error(`Cannot find MoonBit core at ${source}`);
+  }
+  fs.rmSync(dest, { force: true, recursive: true });
+  fs.mkdirSync(path.dirname(dest), { recursive: true });
+  fs.cpSync(source, dest, { recursive: true });
+  return dest;
+}
 
 function gzip(path) {
   const dest = `${path}.gz`;
@@ -22,11 +39,15 @@ function isDotFile(filePath) {
 function generate() {
   const cwd = process.cwd();
   const data = path.join(cwd, "data");
-  const core = path.join(data, "lib", "core");
+  const core = copyCore(data);
   cp.execSync("moon clean", { cwd: core, encoding: "utf8" });
   cp.execSync("moon bundle --target js", { cwd: core, encoding: "utf8" });
   const jsCoreCore = path.join(core, "_build/js/release/bundle/core.core");
   gzip(jsCoreCore);
+  const jsAbortCore = path.join(
+    core,
+    "_build/js/release/bundle/abort/abort.core",
+  );
 
   const packagesPath = path.join(core, "_build", "packages.json");
   const packagesJson = fs.readFileSync(packagesPath, "utf8");
@@ -44,7 +65,8 @@ function generate() {
       (i) =>
         i.isFile() &&
         (extensions.some((e) => i.name.endsWith(e)) ||
-          i.name === "core.core.gz"),
+          i.name === "core.core.gz" ||
+          path.join(i.parentPath, i.name) === jsAbortCore),
     )
     .filter((i) => !i.parentPath.includes("target"))
     .map((i) => path.join(i.parentPath, i.name))

@@ -25,10 +25,6 @@ const plugin: Plugin = {
   name: "copy-worker",
   writeBundle() {
     fs.copyFileSync(
-      "node_modules/@moonbit/analyzer/lsp-server.js",
-      "dist/lsp-server.js",
-    );
-    fs.copyFileSync(
       "node_modules/@moonbit/moonc-worker/moonc-worker.js",
       "dist/moonc-worker.js",
     );

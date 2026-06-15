@@ -17,14 +17,8 @@
 import * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
 import * as Core from "core";
-import * as vscodeUri from "vscode-uri";
-import * as mfs from "./mfs";
 import moonrunWorker from "./moonrun-worker?worker&inline";
-import template from "./template.mbt?raw";
 import type { TraceResult, TraceRunOutput } from "./trace-types";
-
-const MOON_TEST_DELIMITER_BEGIN = "----- BEGIN MOON TEST RESULT -----";
-const MOON_TEST_DELIMITER_END = "----- END MOON TEST RESULT -----";
 
 type Position = {
   line: number;
@@ -32,14 +26,13 @@ type Position = {
 };
 
 type Diagnostic = {
-  level: "warning" | "error";
-  loc: {
-    path: string;
-    start: Position;
-    end: Position;
-  };
+  level: "warning" | "error" | "info";
+  path?: string;
+  start?: Position;
+  end?: Position;
   message: string;
-  error_code: number;
+  errorCode?: number;
+  raw: string;
 };
 
 let mooncWorkerFactory: (() => Worker) | undefined = undefined;
@@ -69,36 +62,145 @@ async function mooncLinkCore(
   return await moonc(async (moonc) => await moonc.linkCore(params));
 }
 
-async function mooncGenTestInfo(
-  params: mooncWeb.genTestInfoParams,
-): Promise<ReturnType<typeof mooncWeb.genTestInfo>> {
-  return await moonc(async (moonc) => await moonc.genTestInfo(params));
-}
-
 function getStdMiFiles(): [string, Uint8Array][] {
   return Core.getLoadPkgsParams("js");
 }
 
-type CompileResult =
+function parseLoc(loc: unknown): { start?: Position; end?: Position } {
+  if (typeof loc === "string") {
+    const match = loc.match(/^(\d+):(\d+)-(\d+):(\d+)$/);
+    if (match) {
+      return {
+        start: { line: Number(match[1]), col: Number(match[2]) },
+        end: { line: Number(match[3]), col: Number(match[4]) },
+      };
+    }
+    const sameLineMatch = loc.match(/^(\d+):(\d+)-(\d+)$/);
+    if (sameLineMatch) {
+      const line = Number(sameLineMatch[1]);
+      return {
+        start: { line, col: Number(sameLineMatch[2]) },
+        end: { line, col: Number(sameLineMatch[3]) },
+      };
+    }
+  }
+  if (typeof loc === "object" && loc !== null) {
+    const value = loc as {
+      path?: unknown;
+      start?: { line?: unknown; col?: unknown };
+      end?: { line?: unknown; col?: unknown };
+    };
+    const start =
+      typeof value.start?.line === "number" &&
+      typeof value.start?.col === "number"
+        ? { line: value.start.line, col: value.start.col }
+        : undefined;
+    const end =
+      typeof value.end?.line === "number" && typeof value.end?.col === "number"
+        ? { line: value.end.line, col: value.end.col }
+        : undefined;
+    return { start, end };
+  }
+  return {};
+}
+
+function normalizeDiagnostic(raw: string): Diagnostic {
+  try {
+    const parsed = JSON.parse(raw) as {
+      level?: unknown;
+      message?: unknown;
+      path?: unknown;
+      loc?: unknown;
+      error_code?: unknown;
+    };
+    const locPath =
+      typeof parsed.loc === "object" &&
+      parsed.loc !== null &&
+      typeof (parsed.loc as { path?: unknown }).path === "string"
+        ? (parsed.loc as { path: string }).path
+        : undefined;
+    const { start, end } = parseLoc(parsed.loc);
+    return {
+      level:
+        parsed.level === "warning" || parsed.level === "info"
+          ? parsed.level
+          : "error",
+      path: typeof parsed.path === "string" ? parsed.path : locPath,
+      start,
+      end,
+      message: typeof parsed.message === "string" ? parsed.message : raw,
+      errorCode:
+        typeof parsed.error_code === "number" ? parsed.error_code : undefined,
+      raw,
+    };
+  } catch {
+    return {
+      level: "error",
+      message: raw,
+      raw,
+    };
+  }
+}
+
+function normalizeDiagnostics(diagnostics: string[]): Diagnostic[] {
+  return diagnostics.map(normalizeDiagnostic);
+}
+
+function formatDiagnostics(diagnostics: Diagnostic[]): string {
+  if (diagnostics.length <= 0) {
+    return "Single-file link failed but no diagnostics were returned.";
+  }
+  return diagnostics.map((d) => d.message).join("\n");
+}
+
+function toErrorMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  return String(error);
+}
+
+type SingleFileInput = {
+  code: string;
+  filename?: string;
+  debugMain?: boolean;
+  enableValueTracing?: boolean;
+  exportedFunctions?: string[];
+};
+
+type NormalizedSingleFileInput = {
+  code: string;
+  filename: string;
+  debugMain: boolean;
+  enableValueTracing: boolean;
+  exportedFunctions: string[];
+};
+
+type LinkSingleFileResult =
   | {
       kind: "success";
       js: Uint8Array;
+      diagnostics: Diagnostic[];
     }
   | {
       kind: "error";
+      stage: "build" | "link";
       diagnostics: Diagnostic[];
+      message: string;
     };
 
-type Input = [name: string, content: string];
-
-type CompileParams = {
-  libInputs: Input[];
-  testInputs?: Input[];
-  debugMain?: boolean;
-  enableValueTracing?: boolean;
-  isMain?: boolean;
-  exportedFunctions?: string[];
-};
+type RunSingleFileResult =
+  | {
+      kind: "success";
+      output: string;
+      diagnostics: Diagnostic[];
+    }
+  | {
+      kind: "error";
+      stage: "link" | "runtime";
+      diagnostics?: Diagnostic[];
+      message: string;
+    };
 
 async function bufferToDataURL(
   buffer: Uint8Array,
@@ -114,80 +216,53 @@ async function bufferToDataURL(
   });
 }
 
-async function compile(params: CompileParams): Promise<CompileResult> {
-  const fs = mfs.MFS.getMFs();
-  const {
-    libInputs,
-    testInputs = [],
-    debugMain = false,
-    enableValueTracing = false,
-    isMain = true,
-    exportedFunctions = [],
-  } = params;
+function normalizeSingleFileInput(
+  input: string | SingleFileInput,
+): NormalizedSingleFileInput {
+  const params = typeof input === "string" ? { code: input } : input;
+  const filename = params.filename?.replace(/^\/+/, "") || "main.mbt";
+  return {
+    code: params.code,
+    filename,
+    debugMain: params.debugMain ?? false,
+    enableValueTracing: params.enableValueTracing ?? false,
+    exportedFunctions: params.exportedFunctions ?? [],
+  };
+}
 
-  const isTest = testInputs.length > 0;
-  const stdMiFiles = getStdMiFiles();
-  let res;
-  if (isTest) {
-    const testInfo = await mooncGenTestInfo({ mbtFiles: testInputs });
-    const driver = template
-      .replace(
-        `let tests = {  } // WILL BE REPLACED
-  let no_args_tests = {  } // WILL BE REPLACED
-  let with_args_tests = {  } // WILL BE REPLACED`,
-        testInfo,
-      )
-      .replace(`{PACKAGE}`, "moonpad/lib")
-      .replace("{BEGIN_MOONTEST}", MOON_TEST_DELIMITER_BEGIN)
-      .replace("{END_MOONTEST}", MOON_TEST_DELIMITER_END);
-
-    testInputs.push(["driver.mbt", driver]);
-
-    res = await mooncBuildPackage({
-      mbtFiles: [...libInputs, ...testInputs],
-      miFiles: [],
-      stdMiFiles,
-      target: "js",
-      pkg: "moonpad/lib",
-      pkgSources: ["moonpad/lib:moonpad:/"],
-      errorFormat: "json",
-      isMain: true,
-      enableValueTracing,
-      noOpt: false,
-      indirectImportMiFiles: [],
-    });
-  } else {
-    res = await mooncBuildPackage({
-      mbtFiles: libInputs,
-      miFiles: [],
-      stdMiFiles,
-      target: "js",
-      pkg: "moonpad/lib",
-      pkgSources: ["moonpad/lib:moonpad:/"],
-      isMain,
-      enableValueTracing,
-      errorFormat: "json",
-      noOpt: debugMain,
-      indirectImportMiFiles: [],
-    });
-  }
-  const { core, mi, diagnostics } = res;
+async function linkSingleFile(
+  input: string | SingleFileInput,
+): Promise<LinkSingleFileResult> {
+  const params = normalizeSingleFileInput(input);
+  const buildResult = await mooncBuildPackage({
+    mbtFiles: [[params.filename, params.code]],
+    miFiles: [],
+    stdMiFiles: getStdMiFiles(),
+    target: "js",
+    pkg: "moonpad/single",
+    pkgSources: ["moonpad/single:moonpad:/"],
+    isMain: true,
+    enableValueTracing: params.enableValueTracing,
+    errorFormat: "json",
+    noOpt: params.debugMain,
+    indirectImportMiFiles: [],
+  });
+  const { core, mi, diagnostics } = buildResult;
+  const parsedDiagnostics = normalizeDiagnostics(diagnostics);
   if (core === undefined || mi === undefined) {
     return {
       kind: "error",
-      diagnostics: diagnostics.map((d) => JSON.parse(d) as Diagnostic),
+      stage: "build",
+      diagnostics: parsedDiagnostics,
+      message: formatDiagnostics(parsedDiagnostics),
     };
   }
 
-  const coreCoreUri = vscodeUri.URI.parse(
-    `moonbit-core:/lib/core/_build/js/release/bundle/core.core`,
-  );
-  const coreCore = await fs.readFile(coreCoreUri);
-  const coreFiles = [coreCore, core];
+  const coreFiles = [...(await Core.getCoreRuntimeFiles("js")), core];
   const sources: {
     [key: string]: string;
   } = {};
-  if (debugMain) {
+  if (params.debugMain) {
     for (const key in Core.coreMap) {
       if (key.endsWith(".mbt")) {
         sources[`moonbit-core:${key}`] = new TextDecoder().decode(
@@ -195,87 +270,53 @@ async function compile(params: CompileParams): Promise<CompileResult> {
         );
       }
     }
-    for (const [name, content] of [...libInputs, ...testInputs]) {
-      sources[`moonpad:/${name}`] = content;
-    }
+    sources[`moonpad:/${params.filename}`] = params.code;
   }
-  const { result, sourceMap } = await mooncLinkCore({
-    coreFiles,
-    exportedFunctions,
-    main: isTest ? "moonpad/lib_blackbox_test" : "moonpad/lib",
-    outputFormat: "wasm",
-    pkgSources: [
-      "moonbitlang/core:moonbit-core:/lib/core",
-      "moonpad/lib:moonpad:/",
-    ],
-    sources,
-    target: "js",
-    testMode: isTest,
-    sourceMap: debugMain,
-    debug: debugMain,
-    noOpt: debugMain,
-    sourceMapUrl: "%%moon-internal-to-be-replaced.map%%",
-    stopOnMain: debugMain,
-  });
-  let js = result;
-  if (sourceMap !== undefined) {
-    const sourceMapUrl = await bufferToDataURL(
-      new TextEncoder().encode(sourceMap),
-      "application/json",
-    );
-    js = new TextEncoder().encode(
-      new TextDecoder("utf8")
-        .decode(result)
-        .replace("%%moon-internal-to-be-replaced.map%%", sourceMapUrl),
-    );
-  }
-  return {
-    kind: "success",
-    js,
-  };
-}
 
-type TestOutput =
-  | {
-      kind: "stdout";
-      stdout: string;
+  try {
+    const { result, sourceMap } = await mooncLinkCore({
+      coreFiles,
+      exportedFunctions: params.exportedFunctions,
+      main: "moonpad/single",
+      outputFormat: "wasm",
+      pkgSources: [
+        "moonbitlang/core:moonbit-core:/lib/core",
+        "moonpad/single:moonpad:/",
+      ],
+      sources,
+      target: "js",
+      testMode: false,
+      sourceMap: params.debugMain,
+      debug: params.debugMain,
+      noOpt: params.debugMain,
+      sourceMapUrl: "%%moon-internal-to-be-replaced.map%%",
+      stopOnMain: params.debugMain,
+    });
+    let js = result;
+    if (sourceMap !== undefined) {
+      const sourceMapUrl = await bufferToDataURL(
+        new TextEncoder().encode(sourceMap),
+        "application/json",
+      );
+      js = new TextEncoder().encode(
+        new TextDecoder("utf8")
+          .decode(result)
+          .replace("%%moon-internal-to-be-replaced.map%%", sourceMapUrl),
+      );
     }
-  | ({
-      kind: "result";
-    } & TestResult);
-
-type TestResult = {
-  package: string;
-  filename: string;
-  test_name: string;
-  message: string;
-};
-
-function parseTestOutputTransformStream(): TransformStream<string, TestOutput> {
-  let isInSection = false;
-  let stdout = "";
-  const stream = new TransformStream<string, TestOutput>({
-    transform(line, controller) {
-      if (line === MOON_TEST_DELIMITER_BEGIN) {
-        controller.enqueue({ kind: "stdout", stdout });
-        stdout = "";
-        isInSection = true;
-      } else if (line === MOON_TEST_DELIMITER_END) {
-        isInSection = false;
-      } else {
-        if (isInSection) {
-          const testResult = JSON.parse(line) as TestResult;
-          controller.enqueue({ kind: "result", ...testResult });
-        } else {
-          stdout += line + "\n";
-        }
-      }
-    },
-    flush(controller) {
-      controller.terminate();
-    },
-  });
-  return stream;
+    return {
+      kind: "success",
+      js,
+      diagnostics: parsedDiagnostics,
+    };
+  } catch (error) {
+    return {
+      kind: "error",
+      stage: "link",
+      diagnostics: parsedDiagnostics,
+      message: toErrorMessage(error),
+    };
+  }
 }
 
 function run(js: Uint8Array): ReadableStream<string> {
@@ -298,9 +339,59 @@ function run(js: Uint8Array): ReadableStream<string> {
   });
 }
 
-function runTrace(
-  js: Uint8Array,
-): ReadableStream<TraceRunOutput> {
+async function collectOutput(stream: ReadableStream<string>): Promise<string> {
+  const output: string[] = [];
+  await stream.pipeTo(
+    new WritableStream<string>({
+      write(chunk) {
+        output.push(chunk);
+      },
+    }),
+  );
+  return output.join("\n");
+}
+
+async function runSingleFile(
+  input: string | SingleFileInput,
+): Promise<RunSingleFileResult> {
+  let linkResult: LinkSingleFileResult;
+  try {
+    linkResult = await linkSingleFile(input);
+  } catch (error) {
+    return {
+      kind: "error",
+      stage: "link",
+      message: toErrorMessage(error),
+    };
+  }
+
+  if (linkResult.kind === "error") {
+    return {
+      kind: "error",
+      stage: "link",
+      diagnostics: linkResult.diagnostics,
+      message: linkResult.message,
+    };
+  }
+
+  try {
+    const output = await collectOutput(run(linkResult.js));
+    return {
+      kind: "success",
+      output,
+      diagnostics: linkResult.diagnostics,
+    };
+  } catch (error) {
+    return {
+      kind: "error",
+      stage: "runtime",
+      diagnostics: linkResult.diagnostics,
+      message: toErrorMessage(error),
+    };
+  }
+}
+
+function runTrace(js: Uint8Array): ReadableStream<TraceRunOutput> {
   const worker = new moonrunWorker();
   let isClosed = false;
   const closeWorker = () => {
@@ -335,14 +426,17 @@ function runTrace(
   });
 }
 
-function test(js: Uint8Array): ReadableStream<TestOutput> {
-  return run(js).pipeThrough(parseTestOutputTransformStream());
-}
-
 function init(factory: () => Worker) {
   if (mooncWorkerFactory !== undefined) return;
   mooncWorkerFactory = factory;
 }
 
-export { compile, init, run, runTrace, test };
-export type { TraceResult, TraceRunOutput };
+export { init, linkSingleFile, runSingleFile, runTrace };
+export type {
+  Diagnostic,
+  LinkSingleFileResult,
+  RunSingleFileResult,
+  SingleFileInput,
+  TraceResult,
+  TraceRunOutput,
+};

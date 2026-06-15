@@ -26,4 +26,38 @@ function getLoadPkgsParams(target = "wasm-gc") {
   });
 }
 
-export { getLoadPkgsParams, coreMap, corePkgs };
+async function getCoreFile(path) {
+  let content = coreMap[path];
+  if (content !== undefined) {
+    return content;
+  }
+  const compressedContent = coreMap[`${path}.gz`];
+  if (compressedContent === undefined) {
+    throw new Error(`Cannot find MoonBit core file: ${path}`);
+  }
+  const blob = new Blob([compressedContent], {
+    type: "application/octet-stream",
+  });
+  const ungzip = new DecompressionStream("gzip");
+  const resp = new Response(blob.stream().pipeThrough(ungzip));
+  content = new Uint8Array(await resp.arrayBuffer());
+  coreMap[path] = content;
+  delete coreMap[`${path}.gz`];
+  return content;
+}
+
+async function getCoreRuntimeFiles(target = "js") {
+  const base = `/lib/core/_build/${target}/release/bundle`;
+  return await Promise.all([
+    getCoreFile(`${base}/abort/abort.core`),
+    getCoreFile(`${base}/core.core`),
+  ]);
+}
+
+export {
+  getLoadPkgsParams,
+  getCoreFile,
+  getCoreRuntimeFiles,
+  coreMap,
+  corePkgs,
+};

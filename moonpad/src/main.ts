@@ -14,7 +14,6 @@
  * limitations under the License.
  */
 
-import lspWorker from "@moonbit/analyzer/lsp-server?worker";
 import * as monaco from "monaco-editor-core";
 import editorWorker from "monaco-editor-core/esm/vs/editor/editor.worker?worker";
 import * as moonbitMode from ".";
@@ -24,7 +23,6 @@ import "./styles.css";
 
 const moon = moonbitMode.init({
   onigWasmUrl: wasmUrl,
-  lspWorker: new lspWorker(),
   mooncWorkerFactory: () => new mooncWorker(),
 });
 
@@ -39,27 +37,18 @@ monaco.editor.setTheme("light-plus");
 
 const model = monaco.editor.createModel(
   `
-pub fn solve(a: Int, b: Int) -> Int {
-  println(a)
-  println(b)
-  a + b
+fn main {
+  let a = 1
+  let b = 2
+  let c = a + b
+  println(c)
 }
 `,
   "moonbit",
-  monaco.Uri.file("/src/lib/hello.mbt"),
+  monaco.Uri.file("/main.mbt"),
 );
 
 monaco.editor.create(document.getElementById("normal")!, { model });
-
-const model2 = monaco.editor.createModel(
-  `test {
-  inspect(solve(1, 2), content="3")
-}`,
-  "moonbit",
-  monaco.Uri.file("/src/lib/hello_wbtest.mbt"),
-);
-
-monaco.editor.create(document.getElementById("test")!, { model: model2 });
 
 const trace = moonbitMode.traceCommandFactory();
 
@@ -84,29 +73,20 @@ traceModel.onDidChangeContent(async () => {
 });
 
 model.onDidChangeContent(run);
-model2.onDidChangeContent(run);
+void run();
 
 async function run() {
-  const result = await moon.compile({
-    libInputs: [["hello.mbt", model.getValue()]],
-    testInputs: [["hello_wbtest.mbt", model2.getValue()]],
-    debugMain: false,
+  const result = await moon.runSingleFile({
+    code: model.getValue(),
+    filename: model.uri.path,
   });
   switch (result.kind) {
     case "success": {
-      const js = result.js;
-      const stream = moon.test(js);
-      await stream.pipeTo(
-        new WritableStream({
-          write(chunk) {
-            console.log(chunk);
-          },
-        }),
-      );
+      console.log(result.output);
       return;
     }
     case "error": {
-      console.error(result.diagnostics);
+      console.error(result.message);
     }
   }
 }

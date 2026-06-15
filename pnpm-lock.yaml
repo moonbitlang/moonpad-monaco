@@ -30,45 +30,11 @@ importers:
         specifier: ^6.0.1
         version: 6.0.7(@types/node@22.10.5)(terser@5.36.0)
 
-  moon:
-    dependencies:
-      '@moonbit/moonc-worker':
-        specifier: ^0.1.202604291
-        version: 0.1.202604291
-      comlink:
-        specifier: ^4.4.2
-        version: 4.4.2
-    devDependencies:
-      '@types/node':
-        specifier: ^22.10.1
-        version: 22.10.5
-      core:
-        specifier: workspace:^
-        version: link:../core
-      prettier:
-        specifier: ^3.4.2
-        version: 3.4.2
-      prettier-plugin-organize-imports:
-        specifier: ^4.1.0
-        version: 4.1.0(prettier@3.4.2)(typescript@5.7.2)
-      typescript:
-        specifier: ~5.7.2
-        version: 5.7.2
-      vite:
-        specifier: ^6.0.5
-        version: 6.0.7(@types/node@22.10.5)(terser@5.36.0)
-      vite-plugin-dts:
-        specifier: ^4.4.0
-        version: 4.4.0(@types/node@22.10.5)(rollup@4.29.1)(typescript@5.7.2)(vite@6.0.7(@types/node@22.10.5)(terser@5.36.0))
-
   moonpad:
     dependencies:
-      '@moonbit/analyzer':
-        specifier: ^0.1.202604291
-        version: 0.1.202604291
       '@moonbit/moonc-worker':
-        specifier: ^0.1.202604291
-        version: 0.1.202604291
+        specifier: ^0.1.202606094
+        version: 0.1.202606094
       '@zenfs/core':
         specifier: ^1.6.17
         version: 1.6.17
@@ -78,12 +44,6 @@ importers:
       monaco-editor-core:
         specifier: ^0.52.0
         version: 0.52.0
-      vscode-jsonrpc:
-        specifier: ^8.2.1
-        version: 8.2.1
-      vscode-languageserver-protocol:
-        specifier: ^3.17.5
-        version: 3.17.5
       vscode-oniguruma:
         specifier: ^2.0.1
         version: 2.0.1
@@ -332,11 +292,8 @@ packages:
   '@microsoft/tsdoc@0.15.1':
     resolution: {integrity: sha512-4aErSrCR/On/e5G2hDP0wjooqDdauzEbIq8hIkIe5pXV0rtWJZvdCEKL0ykZxex+IxIwBp0eGeV48hQN07dXtw==}
 
-  '@moonbit/analyzer@0.1.202604291':
-    resolution: {integrity: sha512-YwhutHOkGzAUtNvsqG5/X4o+X9muBYlv3MIhJiodVnzH2HvmglKYB26ctGKW2eK/418qI9NPp3bzPH88xQxOUw==}
-
-  '@moonbit/moonc-worker@0.1.202604291':
-    resolution: {integrity: sha512-M0ZPApdcJ4SCre0Mq6yp/feVJ6+MyaSsk5xUaSpUh/wstzNafaByBKP65jQ4HS00QI/0Z4Mzlx26JfSaepZ6YA==}
+  '@moonbit/moonc-worker@0.1.202606094':
+    resolution: {integrity: sha512-win38k3+rtjiwUaYM46Qmk+qU3ln9nPn47n+Sa+ec7rFMN/Ls1l9tmQ8pJmXcUIK2r9utZJoKkeC2B4aOr7kNg==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -1104,20 +1061,6 @@ packages:
       yaml:
         optional: true
 
-  vscode-jsonrpc@8.2.0:
-    resolution: {integrity: sha512-C+r0eKJUIfiDIfwJhria30+TYWPtuHJXHtI7J0YlOmKAo7ogxP20T0zxB7HZQIFhIyvoBPwWskjxrvAtfjyZfA==}
-    engines: {node: '>=14.0.0'}
-
-  vscode-jsonrpc@8.2.1:
-    resolution: {integrity: sha512-kdjOSJ2lLIn7r1rtrMbbNCHjyMPfRnowdKjBQ+mGq6NAW5QY2bEZC/khaC5OR8svbbjvLEaIXkOq45e2X9BIbQ==}
-    engines: {node: '>=14.0.0'}
-
-  vscode-languageserver-protocol@3.17.5:
-    resolution: {integrity: sha512-mb1bvRJN8SVznADSGWM9u/b07H7Ecg0I3OgXDuLdn307rl/J3A9YD6/eYOssqhecL27hK1IPZAsaqh00i/Jljg==}
-
-  vscode-languageserver-types@3.17.5:
-    resolution: {integrity: sha512-Ld1VelNuX9pdF39h2Hgaeb5hEZM2Z3jUrrMgWQAu82jMtZp7p3vJT3BzToKtZI7NgQssZje5o0zryOrhQvzQAg==}
-
   vscode-oniguruma@2.0.1:
     resolution: {integrity: sha512-poJU8iHIWnC3vgphJnrLZyI3YdqRlR27xzqDmpPXYzA93R4Gk8z7T6oqDzDoHjoikA2aS82crdXFkjELCdJsjQ==}
 
@@ -1332,9 +1275,7 @@ snapshots:
 
   '@microsoft/tsdoc@0.15.1': {}
 
-  '@moonbit/analyzer@0.1.202604291': {}
-
-  '@moonbit/moonc-worker@0.1.202604291': {}
+  '@moonbit/moonc-worker@0.1.202606094': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -2099,17 +2040,6 @@ snapshots:
       '@types/node': 22.10.5
       fsevents: 2.3.3
       terser: 5.36.0
-
-  vscode-jsonrpc@8.2.0: {}
-
-  vscode-jsonrpc@8.2.1: {}
-
-  vscode-languageserver-protocol@3.17.5:
-    dependencies:
-      vscode-jsonrpc: 8.2.0
-      vscode-languageserver-types: 3.17.5
-
-  vscode-languageserver-types@3.17.5: {}
 
   vscode-oniguruma@2.0.1: {}
 

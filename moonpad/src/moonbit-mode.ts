@@ -15,21 +15,23 @@
  */
 
 import * as monaco from "monaco-editor-core";
-import * as lsp from "vscode-languageserver-protocol";
 import * as oniguruma from "vscode-oniguruma";
 import * as textmate from "vscode-textmate";
-import * as adaptor from "./adaptor";
-import * as connection from "./connection";
 import * as mfs from "./mfs";
 import * as moon from "./moon";
 import moonbitTmGrammar from "./moonbit.tmLanguage.json?raw";
 
 type initParams = {
   onigWasmUrl: string;
-  lspWorker: Worker;
   mooncWorkerFactory: () => Worker;
-  codeLensFilter?: (lens: lsp.CodeLens) => boolean;
 };
+
+type SingleFileInputModel = {
+  name: string;
+  model: monaco.editor.ITextModel | undefined;
+};
+
+const markerOwner = "moonbit";
 
 type TraceModelState = {
   decorations: string[];
@@ -39,7 +41,9 @@ type TraceModelState = {
 
 const sharedTraceStates = new Map<string, TraceModelState>();
 
-function createTraceModelState(model: monaco.editor.ITextModel): TraceModelState {
+function createTraceModelState(
+  model: monaco.editor.ITextModel,
+): TraceModelState {
   const state: TraceModelState = {
     decorations: [],
   };
@@ -88,21 +92,7 @@ function initFs(fs: mfs.MFS): void {
           ]
         }
       },
-      "wbtest-files": {
-        "/src/lib/hello_wbtest.mbt": {
-          "backend": [
-            "Wasm",
-            "WasmGC",
-            "Js",
-            "Native",
-            "LLVM"
-          ],
-          "optlevel": [
-            "Debug",
-            "Release"
-          ]
-        }
-      },
+      "wbtest-files": {},
       "test-files": {},
       "mbt-md-files": {},
       "deps": [],
@@ -135,18 +125,159 @@ function initFs(fs: mfs.MFS): void {
   );
   fs.writeFileSync("/src/lib/moon.pkg.json", `{}`, { encoding: "utf8" });
   fs.writeFileSync("/src/lib/hello.mbt", "", { encoding: "utf8" });
-  fs.writeFileSync("/src/lib/hello_wbtest.mbt", "", { encoding: "utf8" });
 }
 
-function init(params: initParams): typeof moon {
+function basename(path: string): string {
+  return path.split(/[\\/]/).at(-1) ?? path;
+}
+
+function findModelForInput(name: string): monaco.editor.ITextModel | undefined {
+  const inputBase = basename(name);
+  return monaco.editor
+    .getModels()
+    .find(
+      (model) =>
+        model.getLanguageId() === "moonbit" &&
+        (model.uri.path === name ||
+          model.uri.path.endsWith(`/${name}`) ||
+          basename(model.uri.path) === inputBase),
+    );
+}
+
+function captureSingleFileInputModel(
+  input: string | moon.SingleFileInput,
+): SingleFileInputModel[] {
+  if (typeof input === "string" || input.filename === undefined) {
+    return [];
+  }
+  return [
+    {
+      name: input.filename,
+      model: findModelForInput(input.filename),
+    },
+  ];
+}
+
+function diagnosticMatchesInput(
+  diagnostic: moon.Diagnostic,
+  input: SingleFileInputModel,
+): boolean {
+  if (input.model === undefined) return false;
+  if (diagnostic.path === undefined) return false;
+  const diagnosticBase = basename(diagnostic.path);
+  return (
+    diagnostic.path === input.name ||
+    diagnostic.path.endsWith(`/${input.name}`) ||
+    diagnostic.path === input.model.uri.path ||
+    diagnostic.path.endsWith(input.model.uri.path) ||
+    diagnosticBase === basename(input.name) ||
+    diagnosticBase === basename(input.model.uri.path)
+  );
+}
+
+function severityToMarkerSeverity(
+  level: moon.Diagnostic["level"],
+): monaco.MarkerSeverity {
+  switch (level) {
+    case "warning":
+      return monaco.MarkerSeverity.Warning;
+    case "info":
+      return monaco.MarkerSeverity.Info;
+    case "error":
+      return monaco.MarkerSeverity.Error;
+  }
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.max(min, Math.min(max, value));
+}
+
+function diagnosticToMarker(
+  diagnostic: moon.Diagnostic,
+  model: monaco.editor.ITextModel,
+): monaco.editor.IMarkerData {
+  const lineCount = model.getLineCount();
+  const startLineNumber = clamp(diagnostic.start?.line ?? 1, 1, lineCount);
+  const rawEndLine = diagnostic.end?.line ?? startLineNumber;
+  const endLineNumber = clamp(rawEndLine, startLineNumber, lineCount);
+  const startColumn = clamp(
+    diagnostic.start?.col ?? 1,
+    1,
+    model.getLineMaxColumn(startLineNumber),
+  );
+  const endLineMaxColumn = model.getLineMaxColumn(endLineNumber);
+  let endColumn = clamp(
+    diagnostic.end?.col ?? startColumn + 1,
+    1,
+    endLineMaxColumn,
+  );
+  if (endLineNumber === startLineNumber && endColumn <= startColumn) {
+    endColumn = clamp(startColumn + 1, 1, endLineMaxColumn);
+  }
+  return {
+    startLineNumber,
+    startColumn,
+    endLineNumber,
+    endColumn,
+    message: diagnostic.message,
+    severity: severityToMarkerSeverity(diagnostic.level),
+    code: diagnostic.errorCode?.toString(),
+  };
+}
+
+function applyDiagnostics(
+  inputs: SingleFileInputModel[],
+  diagnostics: moon.Diagnostic[],
+): void {
+  const models = inputs
+    .map((input) => input.model)
+    .filter((model): model is monaco.editor.ITextModel => model !== undefined);
+  const uniqueModels = [...new Set(models)];
+  if (diagnostics.length === 0) {
+    for (const model of uniqueModels) {
+      monaco.editor.setModelMarkers(model, markerOwner, []);
+    }
+    return;
+  }
+  const markers = new Map<
+    monaco.editor.ITextModel,
+    monaco.editor.IMarkerData[]
+  >();
+  for (const model of uniqueModels) {
+    markers.set(model, []);
+  }
+  for (const diagnostic of diagnostics) {
+    const matchedInputs = inputs.filter((input) =>
+      diagnosticMatchesInput(diagnostic, input),
+    );
+    const targetInputs =
+      matchedInputs.length > 0
+        ? matchedInputs
+        : inputs.length === 1
+          ? inputs
+          : [];
+    for (const input of targetInputs) {
+      if (input.model === undefined) continue;
+      markers
+        .get(input.model)
+        ?.push(diagnosticToMarker(diagnostic, input.model));
+    }
+  }
+  for (const [model, modelMarkers] of markers) {
+    monaco.editor.setModelMarkers(model, markerOwner, modelMarkers);
+  }
+}
+
+type MoonpadApi = {
+  runSingleFile(
+    input: string | moon.SingleFileInput,
+  ): Promise<moon.RunSingleFileResult>;
+};
+
+function init(params: initParams): MoonpadApi {
   const fs = mfs.MFS.getMFs();
   initFs(fs);
-  const {
-    onigWasmUrl,
-    lspWorker,
-    mooncWorkerFactory,
-    codeLensFilter = () => true,
-  } = params;
+  const { onigWasmUrl, mooncWorkerFactory } = params;
   let moonbitTokensProvider: monaco.languages.TokensProvider | null = null;
 
   const factory: monaco.languages.TokensProviderFactory = {
@@ -779,239 +910,26 @@ function init(params: initParams): typeof moon {
     ],
   });
 
-  monaco.languages.onLanguage("moonbit", async () => {
-    await connection.init(lspWorker);
-    const c = await connection.connection;
-    c.onNotification(lsp.PublishDiagnosticsNotification.type, (params) => {
-      const { uri, diagnostics } = params;
-      const model = monaco.editor.getModel(monaco.Uri.parse(uri));
-      if (!model) return;
-      monaco.editor.setModelMarkers(
-        model,
-        "moonbit",
-        diagnostics.map(adaptor.diagnosticAdaptor.to),
-      );
-    });
-  });
-
-  monaco.editor.onDidCreateModel(async (model) => {
-    if (model.uri.scheme === "moonbit-core") return;
-    const c = await connection.connection;
-    model.onDidChangeContent(async (e) => {
-      fs.writeFileSync(model.uri.path, model.getValue(), {
-        encoding: "utf8",
-      });
-      c.sendNotification(lsp.DidChangeTextDocumentNotification.type, {
-        textDocument: {
-          uri: model.uri.toString(),
-          version: model.getVersionId(),
-        },
-        contentChanges: e.changes.map(adaptor.contentChangeAdaptor.from),
-      });
-    });
-    await c.sendNotification(lsp.DidOpenTextDocumentNotification.type, {
-      textDocument: {
-        languageId: model.getLanguageId(),
-        text: model.getValue(),
-        uri: model.uri.toString(),
-        version: model.getVersionId(),
-      },
-    });
-  });
-
-  const completionProvider: monaco.languages.CompletionItemProvider = {
-    triggerCharacters: [".", "@", ":", ">", "#"],
-    async provideCompletionItems(model, position, context) {
-      const c = await connection.connection;
-      const wordInfo = model.getWordUntilPosition(position);
-      const wordRange = new monaco.Range(
-        position.lineNumber,
-        wordInfo.startColumn,
-        position.lineNumber,
-        wordInfo.endColumn,
-      );
-      const res = await c.sendRequest(lsp.CompletionRequest.type, {
-        position: adaptor.positionAdaptor.from(position),
-        textDocument: { uri: model.uri.toString() },
-        context: adaptor.completionContextAdaptor.from(context),
-      } satisfies lsp.CompletionParams);
-      if (res === null) return null;
-      return adaptor.completionListAdaptor.to(res, wordRange);
-    },
-  };
-
-  monaco.languages.registerCompletionItemProvider(
-    { language: "moonbit" },
-    completionProvider,
-  );
-
-  const hoverProvider: monaco.languages.HoverProvider = {
-    async provideHover(model, position, _token, _context) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.HoverRequest.type, {
-        position: adaptor.positionAdaptor.from(position),
-        textDocument: { uri: model.uri.toString() },
-      } satisfies lsp.HoverParams);
-      if (res === null) return null;
-      return adaptor.hoverAdaptor.to(res);
-    },
-  };
-
-  monaco.languages.registerHoverProvider(
-    { language: "moonbit" },
-    hoverProvider,
-  );
-
-  const documentFormattingEditProvider: monaco.languages.DocumentFormattingEditProvider =
-    {
-      async provideDocumentFormattingEdits(model, options, _token) {
-        const c = await connection.connection;
-        const res = await c.sendRequest(lsp.DocumentFormattingRequest.type, {
-          textDocument: { uri: model.uri.toString() },
-          options: adaptor.formattingOptionsAdaptor.from(options),
-        } satisfies lsp.DocumentFormattingParams);
-        if (res === null) return null;
-        return res.map(adaptor.textEditAdaptor.to);
-      },
-    };
-
-  monaco.languages.registerDocumentFormattingEditProvider(
-    { language: "moonbit" },
-    documentFormattingEditProvider,
-  );
-
-  const signatureHelpProvider: monaco.languages.SignatureHelpProvider = {
-    signatureHelpTriggerCharacters: ["(", ","],
-    async provideSignatureHelp(model, position, _token, context) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.SignatureHelpRequest.type, {
-        position: adaptor.positionAdaptor.from(position),
-        textDocument: { uri: model.uri.toString() },
-        context: adaptor.signatureHelpContextAdaptor.from(context),
-      } satisfies lsp.SignatureHelpParams);
-      if (res === null) return null;
-      return {
-        value: adaptor.signatureHelpAdaptor.to(res),
-        dispose() {},
-      };
-    },
-  };
-  monaco.languages.registerSignatureHelpProvider(
-    { language: "moonbit" },
-    signatureHelpProvider,
-  );
-
-  const definitionProvider: monaco.languages.DefinitionProvider = {
-    async provideDefinition(model, position, _token) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.DefinitionRequest.type, {
-        position: adaptor.positionAdaptor.from(position),
-        textDocument: { uri: model.uri.toString() },
-      } satisfies lsp.DefinitionParams);
-      if (res === null) return null;
-      if (Array.isArray(res) && lsp.LocationLink.is(res[0])) {
-        console.error("LocationLink not supported yet");
-        return null;
-      } else {
-        return adaptor.definitionAdaptor.to(res as lsp.Definition);
-      }
-    },
-  };
-  monaco.languages.registerDefinitionProvider(
-    { language: "moonbit" },
-    definitionProvider,
-  );
-
-  const renameProvider: monaco.languages.RenameProvider = {
-    async resolveRenameLocation(model, position, _token) {
-      const c = await connection.connection;
-      const defaultWord = model.getWordAtPosition(position);
-      if (defaultWord === null) return null;
-      const defaultRange = new monaco.Range(
-        position.lineNumber,
-        defaultWord.startColumn,
-        position.lineNumber,
-        defaultWord.endColumn,
-      );
-      const defaultText = defaultWord.word;
-      const res = await c.sendRequest(lsp.PrepareRenameRequest.type, {
-        textDocument: { uri: model.uri.toString() },
-        position: adaptor.positionAdaptor.from(position),
-      } satisfies lsp.PrepareRenameParams);
-      if (res === null) return null;
-      return adaptor.prepareRenameResultAdaptor.to(
-        res,
-        defaultRange,
-        defaultText,
-      );
-    },
-    async provideRenameEdits(model, position, newName, _token) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.RenameRequest.type, {
-        textDocument: { uri: model.uri.toString() },
-        position: adaptor.positionAdaptor.from(position),
-        newName,
-      } satisfies lsp.RenameParams);
-      if (res === null) return null;
-      return adaptor.workspaceEditAdaptor.to(res);
-    },
-  };
-
-  monaco.languages.registerRenameProvider(
-    { language: "moonbit" },
-    renameProvider,
-  );
-
-  const referenceProvider: monaco.languages.ReferenceProvider = {
-    async provideReferences(model, position, context, _token) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.ReferencesRequest.type, {
-        position: adaptor.positionAdaptor.from(position),
-        textDocument: { uri: model.uri.toString() },
-        context,
-      } satisfies lsp.ReferenceParams);
-      if (res === null) return null;
-      return res
-        .filter((l) => !l.uri.startsWith("moonbit-core"))
-        .map(adaptor.locationAdaptor.to);
-    },
-  };
-
-  monaco.languages.registerReferenceProvider(
-    { language: "moonbit" },
-    referenceProvider,
-  );
-  const codeLensProvider: monaco.languages.CodeLensProvider = {
-    async provideCodeLenses(model, _token) {
-      const c = await connection.connection;
-      const res = await c.sendRequest(lsp.CodeLensRequest.type, {
-        textDocument: { uri: model.uri.toString() },
-      } satisfies lsp.CodeLensParams);
-      if (res === null) return null;
-      const lenses = res
-        .filter((l) => !l.command?.command.startsWith("moonbit-ai"))
-        .filter(codeLensFilter)
-        .map(adaptor.codeLensAdaptor.to);
-      return {
-        dispose() {},
-        lenses,
-      };
-    },
-  };
-  monaco.languages.registerCodeLensProvider(
-    { language: "moonbit" },
-    codeLensProvider,
-  );
   moon.init(mooncWorkerFactory);
+  const moonApi = {
+    async runSingleFile(
+      input: string | moon.SingleFileInput,
+    ): Promise<moon.RunSingleFileResult> {
+      const inputs = captureSingleFileInputModel(input);
+      const result = await moon.runSingleFile(input);
+      applyDiagnostics(inputs, result.diagnostics ?? []);
+      return result;
+    },
+  } satisfies MoonpadApi;
   const traceMain = traceCommandFactory();
-  monaco.editor.registerCommand("moonbit-lsp/trace-main", async (_, param) => {
+  monaco.editor.registerCommand("moonbit/trace-main", async (_, param) => {
     const fileUri =
       (param as { fileUri?: string; uri?: string } | undefined)?.fileUri ??
       (param as { fileUri?: string; uri?: string } | undefined)?.uri;
     if (!fileUri) return;
     traceMain(fileUri);
   });
-  return moon;
+  return moonApi;
 }
 
 function traceCommandFactory() {
@@ -1020,7 +938,8 @@ function traceCommandFactory() {
     const model = monaco.editor.getModel(muri);
     if (model === null) return;
     const modelId = model.id;
-    const state = sharedTraceStates.get(modelId) ?? createTraceModelState(model);
+    const state =
+      sharedTraceStates.get(modelId) ?? createTraceModelState(model);
     state.clearOnEdit?.dispose();
     state.clearOnEdit = undefined;
     state.decorations = model.deltaDecorations(state.decorations, []);
@@ -1032,11 +951,14 @@ function traceCommandFactory() {
       return current !== undefined && current.aborter === aborter;
     };
     const name = muri.path.split("/").at(-1)!;
-    const result = await moon.compile({
-      libInputs: [[name, model.getValue()]],
+    const inputs = [{ name, model }];
+    const result = await moon.linkSingleFile({
+      code: model.getValue(),
+      filename: name,
       enableValueTracing: true,
     });
     if (!isCurrentRun()) return;
+    applyDiagnostics(inputs, result.diagnostics);
     switch (result.kind) {
       case "error": {
         if (isCurrentRun()) {
@@ -1059,9 +981,8 @@ function traceCommandFactory() {
             filteredTraceResults.length > 0 || currentTraceResults.length === 0
               ? filteredTraceResults
               : currentTraceResults;
-          const normalizedTraceResults = dedupeTraceResultsForRender(
-            traceResultsToRender,
-          );
+          const normalizedTraceResults =
+            dedupeTraceResultsForRender(traceResultsToRender);
           state.decorations = renderTraceResults(
             model,
             state.decorations,
@@ -1069,23 +990,21 @@ function traceCommandFactory() {
           );
         };
         try {
-          await moon
-            .runTrace(js)
-            .pipeTo(
-              new WritableStream<moon.TraceRunOutput>({
-                write(chunk) {
-                  if (chunk.kind === "stdout-batch") {
-                    stdoutLines.push(...chunk.lines);
-                    return;
-                  }
-                  for (const entry of chunk.entries) {
-                    traceResults.set(traceKey(entry), entry);
-                  }
-                  applyTraceResults();
-                },
-              }),
-              { signal: aborter.signal },
-            );
+          await moon.runTrace(js).pipeTo(
+            new WritableStream<moon.TraceRunOutput>({
+              write(chunk) {
+                if (chunk.kind === "stdout-batch") {
+                  stdoutLines.push(...chunk.lines);
+                  return;
+                }
+                for (const entry of chunk.entries) {
+                  traceResults.set(traceKey(entry), entry);
+                }
+                applyTraceResults();
+              },
+            }),
+            { signal: aborter.signal },
+          );
         } catch (error) {
           if (isAbortError(error)) {
             if (isCurrentRun()) state.aborter = undefined;
