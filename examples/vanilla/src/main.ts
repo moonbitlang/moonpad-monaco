@@ -15,7 +15,6 @@
  */
 
 import * as moonbitMode from "@moonbit/moonpad-monaco";
-import mooncWorker from "@moonbit/moonpad-monaco/moonc-worker.js?worker";
 import wasmUrl from "@moonbit/moonpad-monaco/onig.wasm?url";
 import * as monaco from "monaco-editor-core";
 import editorWorker from "monaco-editor-core/esm/vs/editor/editor.worker?worker";
@@ -23,7 +22,6 @@ import "./styles.css";
 
 moonbitMode.init({
   onigWasmUrl: wasmUrl,
-  mooncWorkerFactory: () => new mooncWorker(),
 });
 
 // @ts-ignore
@@ -60,7 +58,23 @@ monaco.editor.create(document.getElementById("app")!, { model });
 
 const trace = moonbitMode.traceCommandFactory();
 
-model.onDidChangeContent(async () => {
-  const stdout = await trace(monaco.Uri.file("/a.mbt").toString());
-  console.log(stdout);
-});
+const output = document.querySelector<HTMLPreElement>("#output")!;
+
+async function run() {
+  const version = model.getVersionId();
+  output.textContent = "";
+  try {
+    const stdout = await trace(model.uri.toString());
+    if (version === model.getVersionId() && stdout !== undefined) {
+      output.textContent = stdout;
+    }
+  } catch (error) {
+    if (version === model.getVersionId()) {
+      output.textContent =
+        error instanceof Error ? error.message : String(error);
+    }
+  }
+}
+
+model.onDidChangeContent(run);
+void run();

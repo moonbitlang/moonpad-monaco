@@ -17,13 +17,11 @@
 import * as monaco from "monaco-editor-core";
 import * as oniguruma from "vscode-oniguruma";
 import * as textmate from "vscode-textmate";
-import * as mfs from "./mfs";
 import * as moon from "./moon";
 import moonbitTmGrammar from "./moonbit.tmLanguage.json?raw";
 
 type initParams = {
   onigWasmUrl: string;
-  mooncWorkerFactory: () => Worker;
 };
 
 type SingleFileInputModel = {
@@ -54,77 +52,6 @@ function createTraceModelState(
   });
   sharedTraceStates.set(model.id, state);
   return state;
-}
-
-function ensureDirSync(fs: mfs.MFS, path: string) {
-  if (!fs.existsSync(path)) {
-    fs.mkdirSync(path, { recursive: true });
-  }
-}
-
-function initFs(fs: mfs.MFS): void {
-  ensureDirSync(fs, "/_build");
-  ensureDirSync(fs, "/src/lib");
-  fs.writeFileSync(
-    "/_build/packages.json",
-    `{
-  "source_dir": "/",
-  "name": "username/hello",
-  "packages": [
-    {
-      "is-main": false,
-      "is-third-party": false,
-      "root-path": "/src/lib",
-      "root": "username/hello",
-      "rel": "lib",
-      "files": {
-        "/src/lib/hello.mbt": {
-          "backend": [
-            "Wasm",
-            "WasmGC",
-            "Js",
-            "Native",
-            "LLVM"
-          ],
-          "optlevel": [
-            "Debug",
-            "Release"
-          ]
-        }
-      },
-      "wbtest-files": {},
-      "test-files": {},
-      "mbt-md-files": {},
-      "deps": [],
-      "wbtest-deps": [],
-      "test-deps": [],
-      "artifact": "/_build/wasm-gc/release/check/lib/lib.mi"
-    }
-  ],
-  "deps": [],
-  "backend": "wasm-gc",
-  "opt_level": "release",
-  "source": "src"
-}
-`,
-    { encoding: "utf8" },
-  );
-  fs.writeFileSync(
-    "/moon.mod.json",
-    `{
-  "name": "username/hello",
-  "version": "0.1.0",
-  "readme": "README.md",
-  "repository": "",
-  "license": "Apache-2.0",
-  "keywords": [],
-  "description": "",
-  "source": "src"
-}`,
-    { encoding: "utf8" },
-  );
-  fs.writeFileSync("/src/lib/moon.pkg.json", `{}`, { encoding: "utf8" });
-  fs.writeFileSync("/src/lib/hello.mbt", "", { encoding: "utf8" });
 }
 
 function basename(path: string): string {
@@ -275,9 +202,7 @@ type MoonpadApi = {
 };
 
 function init(params: initParams): MoonpadApi {
-  const fs = mfs.MFS.getMFs();
-  initFs(fs);
-  const { onigWasmUrl, mooncWorkerFactory } = params;
+  const { onigWasmUrl } = params;
   let moonbitTokensProvider: monaco.languages.TokensProvider | null = null;
 
   const factory: monaco.languages.TokensProviderFactory = {
@@ -910,7 +835,6 @@ function init(params: initParams): MoonpadApi {
     ],
   });
 
-  moon.init(mooncWorkerFactory);
   const moonApi = {
     async runSingleFile(
       input: string | moon.SingleFileInput,
@@ -946,9 +870,13 @@ function traceCommandFactory() {
     state.aborter?.abort();
     const aborter = new AbortController();
     state.aborter = aborter;
+    state.clearOnEdit = model.onDidChangeContent(() => {
+      aborter.abort();
+      state.decorations = model.deltaDecorations(state.decorations, []);
+    });
     const isCurrentRun = () => {
       const current = sharedTraceStates.get(modelId);
-      return current !== undefined && current.aborter === aborter;
+      return !aborter.signal.aborted && current?.aborter === aborter;
     };
     const name = muri.path.split("/").at(-1)!;
     const inputs = [{ name, model }];
@@ -964,8 +892,7 @@ function traceCommandFactory() {
         if (isCurrentRun()) {
           state.aborter = undefined;
         }
-        console.error(result.diagnostics);
-        return;
+        throw new Error(result.message);
       }
       case "success": {
         const js = result.js;
@@ -1013,13 +940,8 @@ function traceCommandFactory() {
           throw error;
         }
         if (!isCurrentRun()) return;
-        state.aborter = undefined;
         applyTraceResults();
-        state.clearOnEdit = model.onDidChangeContent(() => {
-          state.decorations = model.deltaDecorations(state.decorations, []);
-          state.clearOnEdit?.dispose();
-          state.clearOnEdit = undefined;
-        });
+        state.aborter = undefined;
         return stdoutLines.join("\n");
       }
     }

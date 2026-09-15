@@ -17,13 +17,11 @@
 import * as monaco from "monaco-editor-core";
 import editorWorker from "monaco-editor-core/esm/vs/editor/editor.worker?worker";
 import * as moonbitMode from ".";
-import mooncWorker from "../node_modules/@moonbit/moonc-worker/moonc-worker?worker";
 import wasmUrl from "../node_modules/vscode-oniguruma/release/onig.wasm?url";
 import "./styles.css";
 
 const moon = moonbitMode.init({
   onigWasmUrl: wasmUrl,
-  mooncWorkerFactory: () => new mooncWorker(),
 });
 
 // @ts-ignore

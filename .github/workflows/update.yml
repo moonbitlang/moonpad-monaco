@@ -1,48 +1,55 @@
-name: update moonc deps
+name: Build and publish Moonpad
 
-on: workflow_dispatch
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: moonpad-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-      - name: setup moonbit
-        run: |
-          curl https://cli.moonbitlang.com/install/unix.sh | bash
-          echo "$HOME/.moon/bin" >> $GITHUB_PATH
-      - run: |
-          corepack enable
-          corepack install
-          pnpm i
-      - name: update moonc deps
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+      - uses: pnpm/action-setup@v4
+      - run: pnpm install --frozen-lockfile
+      - name: Update compiler and toolchain together
+        if: github.event_name == 'workflow_dispatch'
         run: bash ./update.sh
-      - name: publish
+      - name: Install pinned MoonBit toolchain
+        run: |
+          curl -fsSL https://cli.moonbitlang.com/install/unix.sh -o /tmp/install-moonbit.sh
+          bash /tmp/install-moonbit.sh "$(cat .moon-version)"
+          echo "$HOME/.moon/bin" >> "$GITHUB_PATH"
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test
+      - name: Publish
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
           NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
-          pushd moon
-            node ./scripts/update-version.cjs
-          popd
-          pushd moonpad
-            node ./scripts/update-version.cjs
-          popd
-          if [ -n "$(git status --porcelain)" ]; then
-            git config --global user.name "github-actions[bot]"
-            git config --global user.email "github-actions[bot]@users.noreply.github.com"
-            git add .
-            git commit -m "chore: bump version [skip-ci]"
-            pushd moon
-              pnpm publish --access public
-            popd
-            pushd moonpad
-              pnpm publish --access public
-            popd
+          node moonpad/scripts/update-version.cjs
+          pnpm install --lockfile-only
+          cd moonpad
+          npm publish --ignore-scripts --access public
+          cd ..
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .moon-version moonpad/package.json pnpm-lock.yaml
+          if ! git diff --cached --quiet; then
+            git commit -m "chore: update published version [skip ci]"
             git push origin HEAD:main
-          else
-            echo "No update"
-            exit 0
           fi

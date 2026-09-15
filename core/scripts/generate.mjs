@@ -3,6 +3,44 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import { createRequire } from "node:module";
+
+const require = createRequire(
+  new URL("../../moonpad/package.json", import.meta.url),
+);
+
+function checkToolchain() {
+  const expected = fs
+    .readFileSync(new URL("../../.moon-version", import.meta.url), "utf8")
+    .trim();
+  const actual = cp.execFileSync("moonc", ["-v"], { encoding: "utf8" }).trim();
+  if (!actual.startsWith(`v${expected} `)) {
+    throw new Error(
+      `Expected moonc v${expected}, got ${actual}. Install the version in .moon-version.`,
+    );
+  }
+  const compiler = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        path.dirname(require.resolve("@moonbit/moonc-worker")),
+        "package.json",
+      ),
+      "utf8",
+    ),
+  );
+  if (compiler.version.split("+")[1] !== expected.split("+")[1]) {
+    throw new Error(
+      `Compiler ${compiler.version} does not match toolchain ${expected}.`,
+    );
+  }
+  const coreManifest = fs.readFileSync(
+    path.join(getMoonHome(), "lib/core/moon.mod"),
+    "utf8",
+  );
+  if (!coreManifest.includes(`version = "${expected}"`)) {
+    throw new Error(`The installed core does not match toolchain ${expected}.`);
+  }
+}
 
 function getMoonHome() {
   return process.env.MOON_HOME ?? path.join(os.homedir(), ".moon");
@@ -37,6 +75,7 @@ function isDotFile(filePath) {
 }
 
 function generate() {
+  checkToolchain();
   const cwd = process.cwd();
   const data = path.join(cwd, "data");
   const core = copyCore(data);
@@ -49,16 +88,8 @@ function generate() {
     "_build/js/release/bundle/abort/abort.core",
   );
 
-  const packagesPath = path.join(core, "_build", "packages.json");
-  const packagesJson = fs.readFileSync(packagesPath, "utf8");
-
-  fs.writeFileSync(
-    packagesPath,
-    packagesJson.replaceAll(data, "moonbit-core:"),
-  );
-
   const items = fs.readdirSync(core, { recursive: true, withFileTypes: true });
-  const extensions = ["mi", "json", "mbt"];
+  const extensions = [".mi", ".mbt"];
 
   const files = items
     .filter(
