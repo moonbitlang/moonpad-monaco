@@ -1,9 +1,5 @@
-set -xeuo pipefail
+set -euo pipefail
 
-pushd ./core
-  bash ./scripts/update.sh
-popd
-
-pushd ./moonpad
-  pnpm up @moonbit/moonc-worker
-popd
+cd "$(dirname "$0")"
+pnpm --dir moonpad add --save-exact @moonbit/moonc-worker@latest
+node ./moonpad/scripts/update-toolchain.mjs

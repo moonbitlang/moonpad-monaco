@@ -1,6 +1,6 @@
 {
   "name": "@moonbit/moonpad-monaco",
-  "version": "0.1.202606151",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -8,7 +8,7 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "format": "prettier --write .",
-    "prepublish": "tsc && vite build"
+    "prepack": "pnpm build"
   },
   "license": "Apache-2.0",
   "files": [
@@ -20,11 +20,8 @@
       "types": "./dist/moonpad-monaco.d.ts"
     },
     "./umd": {
-      "require": "./dist/moonpad-monaco.umd.js",
+      "require": "./dist/moonpad-monaco.umd.cjs",
       "types": "./dist/moonpad-monaco.d.ts"
-    },
-    "./moonc-worker.js": {
-      "default": "./dist/moonc-worker.js"
     },
     "./onig.wasm": {
       "default": "./dist/onig.wasm"
@@ -40,15 +37,13 @@
     "vite-plugin-dts": "^4.4.0"
   },
   "dependencies": {
-    "@moonbit/moonc-worker": "^0.1.202606094",
-    "@zenfs/core": "^1.6.17",
+    "@moonbit/moonc-worker": "0.1.202609154",
     "comlink": "^4.4.2",
     "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.2.0",
-    "vscode-uri": "^3.1.0"
+    "vscode-textmate": "^9.2.0"
   },
   "peerDependencies": {
-    "monaco-editor-core": "^0.52.0"
+    "monaco-editor-core": "^0.52.2"
   },
   "prettier": {
     "plugins": [

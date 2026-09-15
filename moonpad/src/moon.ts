@@ -14,9 +14,11 @@
  * limitations under the License.
  */
 
-import * as mooncWeb from "@moonbit/moonc-worker";
+import type * as mooncWeb from "@moonbit/moonc-worker";
 import * as comlink from "comlink";
 import * as Core from "core";
+import type { Compiler } from "./moonc-worker";
+import MooncWorker from "./moonc-worker?worker&inline";
 import moonrunWorker from "./moonrun-worker?worker&inline";
 import type { TraceResult, TraceRunOutput } from "./trace-types";
 
@@ -35,19 +37,17 @@ type Diagnostic = {
   raw: string;
 };
 
-let mooncWorkerFactory: (() => Worker) | undefined = undefined;
-
 async function moonc<T>(
-  callback: (moonc: comlink.Remote<any>) => Promise<T>,
+  callback: (moonc: comlink.Remote<Compiler>) => Promise<T>,
 ): Promise<T> {
-  if (mooncWorkerFactory === undefined) {
-    throw new Error("must init before using moonc");
+  const worker = new MooncWorker();
+  const compiler = comlink.wrap<Compiler>(worker);
+  try {
+    return await callback(compiler);
+  } finally {
+    compiler[comlink.releaseProxy]();
+    worker.terminate();
   }
-  const worker = mooncWorkerFactory();
-  const moonc = comlink.wrap<any>(worker);
-  const res = await callback(moonc);
-  worker.terminate();
-  return res;
 }
 
 async function mooncBuildPackage(
@@ -328,7 +328,7 @@ function run(js: Uint8Array): ReadableStream<string> {
         if (e.data instanceof Error) {
           worker.terminate();
           controller.error(e.data);
-        } else if (e.data) {
+        } else if (e.data !== null) {
           controller.enqueue(e.data);
         } else {
           worker.terminate();
@@ -426,12 +426,7 @@ function runTrace(js: Uint8Array): ReadableStream<TraceRunOutput> {
   });
 }
 
-function init(factory: () => Worker) {
-  if (mooncWorkerFactory !== undefined) return;
-  mooncWorkerFactory = factory;
-}
-
-export { init, linkSingleFile, runSingleFile, runTrace };
+export { linkSingleFile, runSingleFile, runTrace };
 export type {
   Diagnostic,
   LinkSingleFileResult,

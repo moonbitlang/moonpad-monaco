@@ -19,7 +19,8 @@ await esbuild.build({
         build.onStart(() => {
           generate();
         });
-        build.onEnd(() => {
+        build.onEnd((result) => {
+          if (result.errors.length > 0) return;
           fs.copyFileSync("src/core-map.d.ts", "dist/index.d.ts");
         });
       },
